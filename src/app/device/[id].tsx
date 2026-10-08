@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
@@ -10,6 +10,7 @@ import { Screen } from "../../components/common/Screen";
 import { StockActions } from "../../components/common/StockActions";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { api } from "../../lib/api";
+import { useDataSyncStore } from "../../lib/dataSync";
 import type {
   DeviceDetail,
   StockMutation,
@@ -18,8 +19,14 @@ import type {
 
 export default function DeviceDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [detail, setDetail] = useState<DeviceDetail | null>(null);
+  const [loadedDetail, setDetail] = useState<DeviceDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const latestStockMutation = useDataSyncStore(
+    (state) => state.latestStockMutation,
+  );
+  const publishStockMutation = useDataSyncStore(
+    (state) => state.publishStockMutation,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -40,6 +47,24 @@ export default function DeviceDetailRoute() {
       mounted = false;
     };
   }, [id]);
+  const detail = useMemo(
+    () =>
+      loadedDetail &&
+      latestStockMutation &&
+      loadedDetail.covers.some(
+        (cover) => cover.id === latestStockMutation.cover.id,
+      )
+        ? {
+            ...loadedDetail,
+            covers: loadedDetail.covers.map((cover) =>
+              cover.id === latestStockMutation.cover.id
+                ? latestStockMutation.cover
+                : cover,
+            ),
+          }
+        : loadedDetail,
+    [latestStockMutation, loadedDetail],
+  );
 
   const title = detail ? detail.device.model : "Phone details";
   const eyebrow = detail ? detail.device.brand.toUpperCase() : "PHONE DETAIL";
@@ -53,7 +78,7 @@ export default function DeviceDetailRoute() {
       eyebrow={eyebrow}
       title={title}
       subtitle={
-        detail ? `${unitsOnHand} covers available` : "Loading availability"
+        detail ? "Availability and compatible phones" : "Loading availability"
       }
       left={<BackButton onPress={() => router.back()} />}
     />
@@ -64,6 +89,7 @@ export default function DeviceDetailRoute() {
   ): Promise<StockMutation> => {
     try {
       const mutation = await api.updateDeviceStock(id, type, { quantity });
+      publishStockMutation(mutation);
       setDetail((current) =>
         current
           ? {
@@ -107,7 +133,9 @@ export default function DeviceDetailRoute() {
         <DeviceImage device={detail.device} showFallbackLabel size={112} />
         <View style={styles.summaryCopy}>
           <Text style={styles.label}>COVER AVAILABILITY</Text>
-          <Text style={styles.count}>{unitsOnHand} units</Text>
+          <Text style={styles.count}>
+            {unitsOnHand ? `${unitsOnHand} units` : "No covers in stock"}
+          </Text>
           <Text style={styles.caption}>
             {unitsOnHand > 0
               ? `${availableRecords} stock record${availableRecords === 1 ? "" : "s"} available for this phone.`
@@ -115,6 +143,7 @@ export default function DeviceDetailRoute() {
           </Text>
         </View>
       </View>
+      <StockActions quantityOnHand={unitsOnHand} onUpdate={updateStock} />
       {detail.compatibleDevices.length ? (
         <View style={styles.compatibility}>
           <Text style={styles.compatibilityTitle}>SAME COVER FITS</Text>
@@ -146,9 +175,7 @@ export default function DeviceDetailRoute() {
                   <Text numberOfLines={1} style={styles.compatibilityName}>
                     {device.model}
                   </Text>
-                  <Text style={styles.compatibilityHint}>
-                    Open phone details
-                  </Text>
+                  <Text style={styles.compatibilityHint}>View availability</Text>
                 </View>
                 <View style={styles.compatibilityCount}>
                   <Text style={styles.compatibilityNumber}>{unitsOnHand}</Text>
@@ -161,7 +188,14 @@ export default function DeviceDetailRoute() {
           </View>
         </View>
       ) : null}
-      <StockActions quantityOnHand={unitsOnHand} onUpdate={updateStock} />
+      {!unitsOnHand && !detail.compatibleDevices.length ? (
+        <View style={styles.emptyGuide}>
+          <Text style={styles.emptyGuideTitle}>Start with the phone in hand</Text>
+          <Text style={styles.emptyGuideCopy}>
+            Add the available covers now. You can link compatible models as you confirm their fit.
+          </Text>
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -184,18 +218,16 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.8,
   },
-  count: { color: colors.ink, fontSize: 30, fontWeight: "900" },
+  count: { color: colors.ink, fontSize: 25, fontWeight: "900" },
   caption: { color: colors.muted, fontSize: 14 },
   compatibility: { gap: spacing.xs },
   compatibilityTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
   compatibilityCaption: { color: colors.muted, fontSize: 14 },
-  compatibilityGrid: { gap: spacing.sm },
+  compatibilityGrid: { gap: 1, backgroundColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
   compatibilityCard: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    borderRadius: 0,
     flexDirection: "row",
     gap: spacing.sm,
     padding: spacing.sm,
@@ -229,4 +261,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   pressed: { opacity: 0.7 },
+  emptyGuide: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    gap: spacing.xxs,
+    padding: spacing.md,
+  },
+  emptyGuideTitle: { color: colors.ink, fontSize: 15, fontWeight: "900" },
+  emptyGuideCopy: { color: colors.muted, fontSize: 14, lineHeight: 20 },
 });

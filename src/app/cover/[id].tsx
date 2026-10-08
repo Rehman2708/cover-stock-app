@@ -25,13 +25,14 @@ import { commonStyles } from "../../design-system/styles";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { formatDate, titleCase } from "../../lib/format";
 import { api } from "../../lib/api";
+import { useDataSyncStore } from "../../lib/dataSync";
 import type { Cover, InventoryTransaction } from "../../types/domain";
 
 type HistoryFilter = "all" | "sale" | "restock" | "adjustment";
 
 export default function CoverDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [cover, setCover] = useState<Cover | null>(null);
+  const [loadedCover, setCover] = useState<Cover | null>(null);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
@@ -42,6 +43,12 @@ export default function CoverDetailRoute() {
     "increase" | "decrease"
   >("increase");
   const [adjustmentReason, setAdjustmentReason] = useState("");
+  const latestStockMutation = useDataSyncStore(
+    (state) => state.latestStockMutation,
+  );
+  const publishStockMutation = useDataSyncStore(
+    (state) => state.publishStockMutation,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -63,6 +70,22 @@ export default function CoverDetailRoute() {
       mounted = false;
     };
   }, [id]);
+  const cover =
+    latestStockMutation?.cover.id === id
+      ? latestStockMutation.cover
+      : loadedCover;
+  const visibleTransactions = useMemo(
+    () =>
+      latestStockMutation?.cover.id === id
+        ? [
+            latestStockMutation.transaction,
+            ...transactions.filter(
+              (item) => item.id !== latestStockMutation.transaction.id,
+            ),
+          ]
+        : transactions,
+    [id, latestStockMutation, transactions],
+  );
 
   const header = (
     <AppHeader
@@ -77,15 +100,16 @@ export default function CoverDetailRoute() {
   const filteredTransactions = useMemo(
     () =>
       historyFilter === "all"
-        ? transactions
-        : transactions.filter(
+        ? visibleTransactions
+        : visibleTransactions.filter(
             (transaction) => transaction.type === historyFilter,
           ),
-    [historyFilter, transactions],
+    [historyFilter, visibleTransactions],
   );
   const update = async (type: "sale" | "restock", quantity: number) => {
     try {
       const mutation = await api.updateStock(id, type, { quantity });
+      publishStockMutation(mutation);
       setCover(mutation.cover);
       setTransactions((current) => [mutation.transaction, ...current]);
       return mutation;
@@ -115,6 +139,7 @@ export default function CoverDetailRoute() {
             : -adjustmentQuantity,
         reason: adjustmentReason.trim(),
       });
+      publishStockMutation(mutation);
       setCover(mutation.cover);
       setTransactions((current) => [mutation.transaction, ...current]);
       setAdjustmentOpen(false);
@@ -195,7 +220,7 @@ export default function CoverDetailRoute() {
         )}
       </View>
       <Text style={commonStyles.sectionTitle}>Stock history</Text>
-      {transactions.length ? (
+      {visibleTransactions.length ? (
         <>
           <FilterChips
             accessibilityLabel="Filter stock history"

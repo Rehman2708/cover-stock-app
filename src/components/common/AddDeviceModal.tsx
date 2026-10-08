@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { api } from "../../lib/api";
+import { useDataSyncStore } from "../../lib/dataSync";
 import type { Device, DeviceBrand } from "../../types/domain";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { Button } from "./Button";
@@ -27,6 +28,7 @@ export function AddDeviceModal({
   onClose,
   onAdded,
 }: AddDeviceModalProps) {
+  const publishDevice = useDataSyncStore((state) => state.publishDevice);
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [brandPickerOpen, setBrandPickerOpen] = useState(false);
@@ -46,6 +48,7 @@ export function AddDeviceModal({
         brand: brand.trim(),
         model: model.trim(),
       });
+      publishDevice(device);
       setBrand("");
       setModel("");
       setBrandPickerOpen(false);

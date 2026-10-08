@@ -1,54 +1,30 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import { api, setAuthToken } from "../../lib/api";
+import { useDataSyncStore } from "../../lib/dataSync";
 import type { AuthSession, AuthUser } from "../../types/domain";
 
 const sessionKey = "coverstock.session";
-let inMemorySession: string | null = null;
-type SecureStoreModule = {
-  getItemAsync: (key: string) => Promise<string | null>;
-  setItemAsync: (key: string, value: string) => Promise<void>;
-  deleteItemAsync: (key: string) => Promise<void>;
-};
-
-let secureStore: SecureStoreModule | null = null;
-try {
-  // Older development clients may not include this native Expo module yet.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  secureStore = require("expo-secure-store") as SecureStoreModule;
-} catch {}
 
 const sessionStorage = {
   get: async () => {
-    if (Platform.OS !== "web")
-      return secureStore
-        ? secureStore.getItemAsync(sessionKey)
-        : inMemorySession;
+    if (Platform.OS !== "web") return SecureStore.getItemAsync(sessionKey);
     try {
-      return globalThis.localStorage?.getItem(sessionKey) ?? inMemorySession;
+      return globalThis.localStorage?.getItem(sessionKey) ?? null;
     } catch {
-      return inMemorySession;
+      return null;
     }
   },
   set: async (value: string) => {
-    if (Platform.OS !== "web") {
-      if (secureStore) return secureStore.setItemAsync(sessionKey, value);
-      inMemorySession = value;
-      return;
-    }
-    inMemorySession = value;
+    if (Platform.OS !== "web") return SecureStore.setItemAsync(sessionKey, value);
     try {
       globalThis.localStorage?.setItem(sessionKey, value);
     } catch {}
   },
   clear: async () => {
-    if (Platform.OS !== "web") {
-      if (secureStore) return secureStore.deleteItemAsync(sessionKey);
-      inMemorySession = null;
-      return;
-    }
-    inMemorySession = null;
+    if (Platform.OS !== "web") return SecureStore.deleteItemAsync(sessionKey);
     try {
       globalThis.localStorage?.removeItem(sessionKey);
     } catch {}
@@ -116,6 +92,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
   logout: async () => {
     await sessionStorage.clear();
+    useDataSyncStore.getState().clear();
     setAuthToken(null);
     set({ user: null });
   },

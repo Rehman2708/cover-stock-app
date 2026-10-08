@@ -7,6 +7,7 @@ import { SkeletonList } from "../../components/common/Skeleton";
 import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { commonStyles } from "../../design-system/styles";
 import { colors, radius, spacing } from "../../design-system/tokens";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { formatDate, titleCase } from "../../lib/format";
 import type { DashboardData } from "../../types/domain";
 import { router } from "expo-router";
@@ -97,29 +98,44 @@ export function DashboardView({
       }
       refreshControl={createRefreshControl(loading, refresh)}
     >
-      <View style={styles.metrics}>
+      <View style={styles.summary}>
+        <Metric label="Units in stock" value={metrics.totalUnits} filter="in_stock" />
         <Metric
-          label="Units available"
-          value={metrics.totalUnits}
-          filter="in_stock"
-        />
-        <Metric
-          label="Low stock"
-          value={metrics.lowStock}
-          tone="warning"
+          label="Need attention"
+          value={attentionCount}
+          tone={attentionCount ? "warning" : "neutral"}
           filter="low_stock"
         />
-        <Metric
-          label="Out of stock"
-          value={metrics.outOfStock}
-          tone="danger"
-          filter="out_of_stock"
-        />
       </View>
-      <SalesChart dailySales={data.dailySales} />
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/search")}
+          style={({ pressed }) => [styles.findAction, pressed && styles.pressed]}
+        >
+          <Ionicons color={colors.primary} name="search-outline" size={22} />
+          <Text style={styles.findActionLabel}>Find a phone</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/search")}
+          style={({ pressed }) => [styles.addAction, pressed && styles.pressed]}
+        >
+          <Ionicons color={colors.white} name="add" size={24} />
+          <Text style={styles.addActionLabel}>Add stock</Text>
+        </Pressable>
+      </View>
       <View style={styles.sectionHead}>
         <Text style={commonStyles.sectionTitle}>Needs attention</Text>
-        <Text style={commonStyles.caption}>{attentionCount} stock entries</Text>
+        <Text
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({ pathname: "/inventory", params: { mode: "stock" } })
+          }
+          style={styles.activityLink}
+        >
+          See all
+        </Text>
       </View>
       {[...data.outOfStock, ...data.lowStock]
         .slice(0, 3)
@@ -190,53 +206,12 @@ export function DashboardView({
     </Screen>
   );
 }
-function SalesChart({
-  dailySales,
-}: {
-  dailySales: DashboardData["dailySales"];
-}) {
-  const maximum = Math.max(...dailySales.map((day) => day.quantity), 1);
-  const total = dailySales.reduce((sum, day) => sum + day.quantity, 0);
-  return (
-    <View
-      accessibilityLabel={`Daily sales for the last seven days: ${total} units sold`}
-      style={styles.salesCard}
-    >
-      <View style={styles.sectionHead}>
-        <View>
-          <Text style={styles.salesTitle}>Daily sales</Text>
-          <Text style={commonStyles.caption}>
-            Units sold in the last 7 days
-          </Text>
-        </View>
-        <Text style={styles.salesTotal}>{total}</Text>
-      </View>
-      <View style={styles.chart}>
-        {dailySales.map((day, index) => (
-          <View key={`${day.date}-${index}`} style={styles.barGroup}>
-            <Text style={styles.barValue}>{day.quantity || ""}</Text>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height: `${Math.max((day.quantity / maximum) * 100, day.quantity ? 8 : 0)}%`,
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.barLabel}>{day.label}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
+
 const styles = StyleSheet.create({
-  metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  summary: { flexDirection: "row", gap: spacing.sm },
   metric: {
-    width: "48%",
-    minHeight: 100,
+    flex: 1,
+    minHeight: 92,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -253,7 +228,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dangerSoft,
     borderColor: colors.dangerSoft,
   },
-  metricValue: { color: colors.ink, fontSize: 24, fontWeight: "900" },
+  metricValue: { color: colors.ink, fontSize: 27, fontWeight: "900" },
   metricLabel: { color: colors.muted, fontSize: 12, fontWeight: "700" },
   sectionHead: {
     flexDirection: "row",
@@ -261,50 +236,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: spacing.sm,
   },
-  salesCard: {
+  actions: { flexDirection: "row", gap: spacing.sm },
+  findAction: {
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.md,
-  },
-  salesTitle: { color: colors.ink, fontSize: 18, fontWeight: "900" },
-  salesTotal: { color: colors.primary, fontSize: 27, fontWeight: "900" },
-  chart: {
-    alignItems: "flex-end",
+    flex: 1,
     flexDirection: "row",
     gap: spacing.xs,
-    height: 136,
-    justifyContent: "space-between",
+    justifyContent: "center",
+    minHeight: 52,
   },
-  barGroup: {
+  findActionLabel: { color: colors.primary, fontSize: 15, fontWeight: "900" },
+  addAction: {
     alignItems: "center",
-    flex: 1,
-    gap: 5,
-    height: "100%",
-    justifyContent: "flex-end",
-  },
-  barValue: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: "900",
-    minHeight: 15,
-  },
-  barTrack: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.pill,
-    height: 88,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-    width: 18,
-  },
-  bar: {
     backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    width: "100%",
+    borderRadius: radius.md,
+    flex: 1,
+    flexDirection: "row",
+    gap: spacing.xs,
+    justifyContent: "center",
+    minHeight: 52,
   },
-  barLabel: { color: colors.muted, fontSize: 11, fontWeight: "800" },
+  addActionLabel: { color: colors.white, fontSize: 15, fontWeight: "900" },
   activityLink: { color: colors.primary, fontSize: 13, fontWeight: "800" },
   good: {
     borderRadius: radius.md,
@@ -317,7 +273,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     padding: spacing.md,
+    borderColor: colors.border,
     borderRadius: radius.md,
+    borderWidth: 1,
     gap: spacing.sm,
   },
   activityDot: {

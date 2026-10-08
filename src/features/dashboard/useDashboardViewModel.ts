@@ -1,21 +1,22 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { api } from "../../lib/api";
-import type { DashboardData } from "../../types/domain";
+import { useDataSyncStore } from "../../lib/dataSync";
 
 export function useDashboardViewModel() {
+  const data = useDataSyncStore((state) => state.dashboard);
+  const cacheDashboard = useDataSyncStore((state) => state.cacheDashboard);
   const [state, setState] = useState<{
-    data: DashboardData | null;
     loading: boolean;
     error: string | null;
-  }>({ data: null, loading: true, error: null });
+  }>({ loading: !data, error: null });
   const load = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
-      setState({ data: await api.getDashboard(), loading: false, error: null });
+      cacheDashboard(await api.getDashboard());
+      setState({ loading: false, error: null });
     } catch (error) {
       setState({
-        data: null,
         loading: false,
         error:
           error instanceof Error
@@ -23,19 +24,21 @@ export function useDashboardViewModel() {
             : "Unable to load the dashboard.",
       });
     }
-  }, []);
+  }, [cacheDashboard]);
   useFocusEffect(
     useCallback(() => {
       let active = true;
       api
         .getDashboard()
         .then((data) => {
-          if (active) setState({ data, loading: false, error: null });
+          if (active) {
+            cacheDashboard(data);
+            setState({ loading: false, error: null });
+          }
         })
         .catch((error: unknown) => {
           if (active)
             setState({
-              data: null,
               loading: false,
               error:
                 error instanceof Error
@@ -46,7 +49,7 @@ export function useDashboardViewModel() {
       return () => {
         active = false;
       };
-    }, []),
+    }, [cacheDashboard]),
   );
-  return { ...state, refresh: load };
+  return { data, ...state, refresh: load };
 }

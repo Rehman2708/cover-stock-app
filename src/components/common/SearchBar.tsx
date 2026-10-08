@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors, radius, spacing } from "../../design-system/tokens";
 
 interface SearchBarProps {
@@ -26,6 +27,7 @@ export function SearchBar({
 }: SearchBarProps) {
   return (
     <View style={styles.form}>
+      <Ionicons color={colors.muted} name="search-outline" size={21} />
       <TextInput
         accessibilityLabel="Search inventory"
         autoCapitalize="none"
@@ -75,7 +77,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   loader: { marginLeft: spacing.sm },
-  input: { color: colors.ink, flex: 1, fontSize: 16, minHeight: 48 },
+  input: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 16,
+    marginLeft: spacing.sm,
+    minHeight: 48,
+  },
   clear: {
     alignItems: "center",
     backgroundColor: colors.primarySoft,

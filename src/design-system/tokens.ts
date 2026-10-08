@@ -1,9 +1,9 @@
 export const colors = {
   ink: "#15231F",
   muted: "#6C7772",
-  canvas: "#F4F7F5",
+  canvas: "#F7F9F7",
   surface: "#FFFFFF",
-  surfaceMuted: "#EAF1ED",
+  surfaceMuted: "#EDF4F0",
   border: "#DDE7E1",
   primary: "#176B4D",
   primaryPressed: "#10543C",
@@ -29,7 +29,7 @@ export const spacing = {
   xxl: 32,
   xxxl: 40,
 };
-export const radius = { sm: 10, md: 16, lg: 22, pill: 999 };
+export const radius = { sm: 10, md: 14, lg: 18, pill: 999 };
 export const font = {
   family: { regular: "System", medium: "System", bold: "System" },
   size: { caption: 12, body: 15, label: 14, title: 22, display: 30 },

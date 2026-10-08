@@ -4,6 +4,7 @@ import { commonStyles } from "../../design-system/styles";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import type { Device } from "../../types/domain";
 import { DeviceImage } from "./DeviceImage";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 interface DeviceCardProps {
   device: Device;
@@ -58,6 +59,7 @@ export function DeviceCard({
           </Text>
         </View>
       ) : null}
+      <Ionicons color={colors.muted} name="chevron-forward" size={20} />
     </Pressable>
   );
 }
@@ -67,7 +69,9 @@ const styles = StyleSheet.create({
     ...commonStyles.card,
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing.md,
+    gap: spacing.sm,
+    minHeight: 76,
+    paddingVertical: spacing.sm,
   },
   pressed: { opacity: 0.72 },
   copy: { flex: 1, gap: 2 },
@@ -77,15 +81,15 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.8,
   },
-  model: { color: colors.ink, fontSize: 17, fontWeight: "900" },
+  model: { color: colors.ink, fontSize: 16, fontWeight: "900" },
   availability: { color: colors.muted, fontSize: 13 },
   count: {
     alignItems: "center",
     backgroundColor: colors.primarySoft,
     borderRadius: radius.md,
-    minWidth: 50,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    minWidth: 46,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 6,
   },
   emptyCount: { backgroundColor: colors.dangerSoft },
   countValue: { color: colors.primary, fontSize: 18, fontWeight: "900" },

@@ -5,6 +5,7 @@ import { commonStyles } from "../../design-system/styles";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { StockBadge } from "./StockBadge";
 import { DeviceImage } from "./DeviceImage";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Cover } from "../../types/domain";
 
 interface CoverCardProps {
@@ -14,6 +15,8 @@ interface CoverCardProps {
 }
 const leadingColumnWidth = 42 + spacing.sm;
 export function CoverCard({ cover, onPress, children }: CoverCardProps) {
+  const compatibleCount =
+    cover.compatibleDevices?.length || cover.compatibleModels?.length || 0;
   const deviceName =
     cover.displayDevice?.model ||
     cover.compatibleModels?.join(" · ") ||
@@ -41,9 +44,15 @@ export function CoverCard({ cover, onPress, children }: CoverCardProps) {
           </Text>
         </View>
         <Text style={styles.quantity}>{cover.quantityOnHand}</Text>
+        <Ionicons color={colors.muted} name="chevron-forward" size={20} />
       </View>
       <View style={styles.meta}>
         <StockBadge cover={cover} />
+        {compatibleCount ? (
+          <Text style={styles.compatibility}>
+            Fits {compatibleCount} {compatibleCount === 1 ? "phone" : "phones"}
+          </Text>
+        ) : null}
       </View>
     </>
   );
@@ -97,6 +106,8 @@ const styles = StyleSheet.create({
   meta: {
     alignItems: "center",
     flexDirection: "row",
+    gap: spacing.sm,
     marginLeft: leadingColumnWidth,
   },
+  compatibility: { color: colors.muted, fontSize: 12, fontWeight: "700" },
 });

@@ -1,13 +1,13 @@
 import { StyleSheet } from "react-native";
-import { colors, font, radius, shadow, spacing } from "./tokens";
+import { colors, font, radius, spacing } from "./tokens";
 
 export const commonStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
   content: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     // Leaves clear space above the floating bottom tabs on every scrollable screen.
     paddingBottom: spacing.xxxl * 3 + spacing.sm,
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   title: {
     color: colors.ink,
@@ -37,8 +37,7 @@ export const commonStyles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
-    ...shadow,
+    padding: spacing.sm,
   },
   row: { flexDirection: "row", alignItems: "center" },
 });

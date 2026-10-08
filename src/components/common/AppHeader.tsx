@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  left: { marginRight: spacing.sm, paddingTop: 13 },
+  left: { marginRight: spacing.sm, paddingTop: 9 },
   copy: { flex: 1, minWidth: 0 },
   eyebrow: {
     color: colors.primary,
@@ -48,6 +48,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: spacing.xxs,
   },
-  title: { color: colors.ink, fontSize: 27, fontWeight: "800", lineHeight: 32 },
+  title: { color: colors.ink, fontSize: 30, fontWeight: "900", lineHeight: 35 },
   subtitle: { marginTop: spacing.xxs, maxWidth: 280 },
 });

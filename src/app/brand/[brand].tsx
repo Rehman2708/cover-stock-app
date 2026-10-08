@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
@@ -13,12 +13,16 @@ import { SearchBar } from "../../components/common/SearchBar";
 import { commonStyles } from "../../design-system/styles";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { api } from "../../lib/api";
+import { useDataSyncStore } from "../../lib/dataSync";
 import { useDebouncedSearch } from "../../features/search/useDebouncedSearch";
 import type { Device } from "../../types/domain";
+
+const maximumLoadedModels = 100;
 
 export default function BrandRoute() {
   const { brand } = useLocalSearchParams<{ brand: string }>();
   const [models, setModels] = useState<Device[]>([]);
+  const modelsRef = useRef<Device[]>([]);
   const {
     query,
     setQuery,
@@ -32,16 +36,21 @@ export default function BrandRoute() {
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [totalModels, setTotalModels] = useState(0);
+  const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
 
   const loadModels = useCallback(
     async (offset = 0) => {
       setLoadingModels(true);
       try {
-        const page = await api.getDevices({ brand, offset });
-        setModels((current) =>
-          offset ? [...current, ...page.items] : page.items,
+      const page = await api.getDevices({ brand, offset });
+        const nextModels = offset
+          ? [...modelsRef.current, ...page.items].slice(0, maximumLoadedModels)
+          : page.items;
+        modelsRef.current = nextModels;
+        setModels(nextModels);
+        setNextOffset(
+          nextModels.length >= maximumLoadedModels ? null : page.nextOffset,
         );
-        setNextOffset(page.nextOffset);
         setTotalModels(page.total);
         setModelsError(null);
       } catch (reason) {
@@ -61,7 +70,7 @@ export default function BrandRoute() {
       void loadModels();
     }, 0);
     return () => clearTimeout(timeout);
-  }, [loadModels]);
+  }, [deviceRevision, loadModels]);
   const hasSearchQuery = Boolean(query.trim());
   const header = (
     <AppHeader

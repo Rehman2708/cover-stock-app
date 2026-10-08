@@ -3,6 +3,7 @@ import { Modal, StyleSheet, Text, View } from "react-native";
 import type { StockMutation, TransactionType } from "../../types/domain";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { Button } from "./Button";
+import { KeyboardAwareBottomSheet } from "./KeyboardAwareBottomSheet";
 import { QuantityStepper } from "./QuantityStepper";
 
 interface StockActionsProps {
@@ -72,22 +73,23 @@ export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
       <View style={styles.actions}>
         <View style={styles.action}>
           <Button
-            compact
             disabled={updating}
-            label="Add stock"
+            label={quantityOnHand === 0 ? "Add stock for this phone" : "Add stock"}
             onPress={() => open("restock")}
-            variant="secondary"
+            variant={quantityOnHand === 0 ? "primary" : "secondary"}
           />
         </View>
-        <View style={styles.action}>
-          <Button
-            compact
-            disabled={updating || quantityOnHand === 0}
-            label="Remove stock"
-            onPress={() => open("sale")}
-            variant="ghost"
-          />
-        </View>
+        {quantityOnHand > 0 ? (
+          <View style={styles.action}>
+            <Button
+              compact
+              disabled={updating}
+              label="Remove stock"
+              onPress={() => open("sale")}
+              variant="ghost"
+            />
+          </View>
+        ) : null}
       </View>
       {undo ? (
         <View accessibilityLiveRegion="polite" style={styles.undo}>
@@ -108,46 +110,48 @@ export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
         visible={Boolean(action)}
       >
         <View style={styles.backdrop}>
-          <View style={styles.sheet}>
-            <View style={styles.handle} />
-            <Text style={styles.eyebrow}>
-              {removing ? "UPDATE AVAILABILITY" : "ADD AVAILABILITY"}
-            </Text>
-            <Text style={styles.title}>
-              {removing
-                ? "Remove covers from stock?"
-                : "How many covers are you adding?"}
-            </Text>
-            <Text style={styles.body}>
-              {removing
-                ? "This lowers the available count. You can undo it immediately after confirming."
-                : "This increases the available count for this phone."}
-            </Text>
-            <QuantityStepper
-              maximum={removing ? quantityOnHand : undefined}
-              onChange={setQuantity}
-              value={quantity}
-            />
-            {removing && quantity > quantityOnHand ? (
-              <Text style={styles.warning}>
-                Only {quantityOnHand} available.
+          <KeyboardAwareBottomSheet>
+            <View style={styles.sheet}>
+              <View style={styles.handle} />
+              <Text style={styles.eyebrow}>
+                {removing ? "UPDATE AVAILABILITY" : "ADD AVAILABILITY"}
               </Text>
-            ) : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Button
-              disabled={!canConfirm}
-              label={removing ? `Remove ${quantity}` : `Add ${quantity}`}
-              loading={updating}
-              onPress={commit}
-            />
-            <Button
-              compact
-              disabled={updating}
-              label="Cancel"
-              onPress={() => setAction(null)}
-              variant="ghost"
-            />
-          </View>
+              <Text style={styles.title}>
+                {removing
+                  ? "Remove covers from stock?"
+                  : "How many covers are you adding?"}
+              </Text>
+              <Text style={styles.body}>
+                {removing
+                  ? "This lowers the available count. You can undo it immediately after confirming."
+                  : "This increases the available count for this phone."}
+              </Text>
+              <QuantityStepper
+                maximum={removing ? quantityOnHand : undefined}
+                onChange={setQuantity}
+                value={quantity}
+              />
+              {removing && quantity > quantityOnHand ? (
+                <Text style={styles.warning}>
+                  Only {quantityOnHand} available.
+                </Text>
+              ) : null}
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <Button
+                disabled={!canConfirm}
+                label={removing ? `Remove ${quantity}` : `Add ${quantity}`}
+                loading={updating}
+                onPress={commit}
+              />
+              <Button
+                compact
+                disabled={updating}
+                label="Cancel"
+                onPress={() => setAction(null)}
+                variant="ghost"
+              />
+            </View>
+          </KeyboardAwareBottomSheet>
         </View>
       </Modal>
     </View>

@@ -1,10 +1,30 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { api } from "../../lib/api";
 import type { Cover, StockMutation, TransactionType } from "../../types/domain";
+import { useDataSyncStore } from "../../lib/dataSync";
 import type { InventoryFilter } from "./InventoryView";
 
+const maximumLoadedCovers = 100;
+
+const matchesFilter = (cover: Cover, filter: InventoryFilter) => {
+  if (filter === "in_stock") return cover.quantityOnHand > 0;
+  if (filter === "low_stock")
+    return (
+      cover.quantityOnHand > 0 &&
+      cover.quantityOnHand <= cover.reorderThreshold
+    );
+  if (filter === "out_of_stock") return cover.quantityOnHand === 0;
+  return true;
+};
+
 export function useInventoryViewModel(filter: InventoryFilter = "all") {
+  const latestStockMutation = useDataSyncStore(
+    (state) => state.latestStockMutation,
+  );
+  const publishStockMutation = useDataSyncStore(
+    (state) => state.publishStockMutation,
+  );
   const [state, setState] = useState<{
     covers: Cover[];
     loading: boolean;
@@ -40,6 +60,37 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
       }));
     }
   }, [filter]);
+  const covers = useMemo(() => {
+    if (!latestStockMutation) return state.covers;
+    const index = state.covers.findIndex(
+      (cover) => cover.id === latestStockMutation.cover.id,
+    );
+    if (index >= 0)
+      return state.covers
+        .map((cover) =>
+          cover.id === latestStockMutation.cover.id
+            ? latestStockMutation.cover
+            : cover,
+        )
+        .filter((cover) => matchesFilter(cover, filter));
+    return state.nextOffset === null &&
+      matchesFilter(latestStockMutation.cover, filter)
+      ? [latestStockMutation.cover, ...state.covers]
+      : state.covers;
+  }, [filter, latestStockMutation, state.covers, state.nextOffset]);
+  const total = useMemo(() => {
+    if (!latestStockMutation) return state.total;
+    const previous = state.covers.find(
+      (cover) => cover.id === latestStockMutation.cover.id,
+    );
+    if (previous)
+      return (
+        state.total +
+        Number(matchesFilter(latestStockMutation.cover, filter)) -
+        Number(matchesFilter(previous, filter))
+      );
+    return covers !== state.covers ? state.total + 1 : state.total;
+  }, [covers, filter, latestStockMutation, state.covers, state.total]);
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -74,14 +125,25 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
   );
   const loadMore = useCallback(async () => {
     const offset = state.nextOffset;
-    if (offset === null || state.loading) return;
+    if (
+      offset === null ||
+      state.loading ||
+      state.covers.length >= maximumLoadedCovers
+    )
+      return;
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
       const page = await api.getCovers({ filter, offset });
       setState((current) => ({
         ...current,
-        covers: [...current.covers, ...page.items],
-        nextOffset: page.nextOffset,
+        covers: [...current.covers, ...page.items].slice(
+          0,
+          maximumLoadedCovers,
+        ),
+        nextOffset:
+          current.covers.length + page.items.length >= maximumLoadedCovers
+            ? null
+            : page.nextOffset,
         total: page.total,
         loading: false,
       }));
@@ -95,7 +157,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
             : "Unable to load more inventory.",
       }));
     }
-  }, [filter, state.loading, state.nextOffset]);
+  }, [filter, state.covers.length, state.loading, state.nextOffset]);
   const updateStock = useCallback(
     async (
       cover: Cover,
@@ -116,6 +178,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
             item.id === cover.id ? result.cover : item,
           ),
         }));
+        publishStockMutation(result);
         return result;
       } catch (error) {
         const message =
@@ -128,7 +191,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
         throw new Error(message);
       }
     },
-    [],
+    [publishStockMutation],
   );
-  return { ...state, refresh: load, loadMore, updateStock };
+  return { ...state, covers, total, refresh: load, loadMore, updateStock };
 }

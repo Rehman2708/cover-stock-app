@@ -15,6 +15,7 @@ import { SearchBar } from "../../components/common/SearchBar";
 import { commonStyles } from "../../design-system/styles";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { api } from "../../lib/api";
+import { useDataSyncStore } from "../../lib/dataSync";
 import {
   InventoryList,
   type InventoryFilter,
@@ -45,6 +46,7 @@ export default function SearchRoute() {
   const [resultFilter, setResultFilter] = useState<SearchResultFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [addDeviceOpen, setAddDeviceOpen] = useState(false);
+  const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
 
   const loadBrands = useCallback(async () => {
     setLoadingBrands(true);
@@ -82,7 +84,7 @@ export default function SearchRoute() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [deviceRevision]);
 
   const search = async () => {
     if (!query.trim()) return;
@@ -131,7 +133,7 @@ export default function SearchRoute() {
   const header = (
     <AppHeader
       eyebrow="INVENTORY"
-      title="Find stock fast"
+      title="Find a phone"
       subtitle={
         mode === "stock"
           ? "Live cover quantities, sales, and restocks."
@@ -151,11 +153,6 @@ export default function SearchRoute() {
         onClear={clearSearch}
         onSubmit={search}
         value={query}
-      />
-      <Button
-        label="Add device"
-        onPress={() => setAddDeviceOpen(true)}
-        variant="secondary"
       />
       <FilterChips
         accessibilityLabel="Choose catalogue view"
@@ -189,7 +186,13 @@ export default function SearchRoute() {
             <>
               <View style={styles.sectionHead}>
                 <Text style={commonStyles.sectionTitle}>Browse by brand</Text>
-                <Text style={commonStyles.caption}>{brands.length} brands</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setAddDeviceOpen(true)}
+                  style={styles.addDeviceLink}
+                >
+                  <Text style={styles.addDeviceLabel}>Add phone</Text>
+                </Pressable>
               </View>
               {loadingBrands ? (
                 <SkeletonList count={5} variant="brand" />
@@ -336,10 +339,15 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   brandCard: {
-    ...commonStyles.card,
     alignItems: "center",
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
     flexDirection: "row",
-    gap: spacing.md,
+    gap: spacing.sm,
+    minHeight: 76,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   brandCopy: { flex: 1 },
   brandName: { color: colors.ink, fontSize: 17, fontWeight: "900" },
@@ -348,8 +356,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
     borderRadius: radius.pill,
     marginLeft: "auto",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    minWidth: 42,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
   },
   modelCountValue: { color: colors.primary, fontSize: 15, fontWeight: "900" },
   modelCountLabel: {
@@ -358,6 +367,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textTransform: "uppercase",
   },
+  addDeviceLink: {
+    minHeight: 40,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xs,
+  },
+  addDeviceLabel: { color: colors.primary, fontSize: 13, fontWeight: "900" },
   device: {
     alignItems: "center",
     backgroundColor: colors.surface,
