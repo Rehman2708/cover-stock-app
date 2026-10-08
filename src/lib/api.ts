@@ -19,12 +19,18 @@ import type {
 } from "../types/domain";
 import { Platform } from "react-native";
 
+const PRODUCTION_API_URL = "https://cover-stock-backend.onrender.com";
+
 // Android emulators reach the development machine through 10.0.2.2; `localhost`
-// would instead point back to the emulator. A configured URL always takes priority
-// so production deployments and physical devices use their explicit API endpoint.
+// would instead point back to the emulator. A configured URL always takes priority.
+// Release builds use the deployed API without requiring a build-time environment file.
 const API_URL = (
   process.env.EXPO_PUBLIC_API_URL ||
-  (Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000")
+  (__DEV__
+    ? Platform.OS === "android"
+      ? "http://10.0.2.2:3000"
+      : "http://localhost:3000"
+    : PRODUCTION_API_URL)
 ).replace(/\/+$/, "");
 let authToken: string | null = null;
 
