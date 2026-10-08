@@ -5,7 +5,7 @@
     "scheme": "coverstock",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/coverStockIcon.png",
     "userInterfaceStyle": "light",
     "experiments": {
       "typedRoutes": true
@@ -17,15 +17,18 @@
     "android": {
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#4E5251",
+        "foregroundImage": "./assets/coverStockIcon.png"
       },
       "package": "com.rehman2708.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/coverStockIcon.png",
+      "splash": {
+        "backgroundColor": "#4E5251",
+        "resizeMode": "contain",
+        "image": "./assets/coverStockIcon.png"
+      }
     },
     "plugins": [
       [
@@ -34,6 +37,15 @@
           "ios": {
             "enableSceneSupport": true
           }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#4E5251",
+          "image": "./assets/coverStockIcon.png",
+          "imageWidth": 240,
+          "resizeMode": "contain"
         }
       ],
       "expo-router",
