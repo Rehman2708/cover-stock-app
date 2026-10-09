@@ -2,26 +2,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
-import { Button } from "../../components/common/Button";
 import { BackButton } from "../../components/common/BackButton";
 import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
-import { Screen } from "../../components/common/Screen";
+import { ListToolbar } from "../../components/common/ListToolbar";
+import { LoadingMore } from "../../components/common/LoadingMore";
+import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { SearchBar } from "../../components/common/SearchBar";
 import { commonStyles } from "../../design-system/styles";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import { api } from "../../lib/api";
 import { useDataSyncStore } from "../../lib/dataSync";
-import { useDebouncedSearch } from "../../features/search/useDebouncedSearch";
+import {
+  type SearchSort,
+  useDebouncedSearch,
+} from "../../features/search/useDebouncedSearch";
 import type { Device } from "../../types/domain";
 
 const maximumLoadedModels = 100;
+type ModelSort = "model_asc" | "model_desc";
 
 export default function BrandRoute() {
   const { brand } = useLocalSearchParams<{ brand: string }>();
   const [models, setModels] = useState<Device[]>([]);
   const modelsRef = useRef<Device[]>([]);
+  const modelsLoadingRef = useRef(false);
+  const [modelSort, setModelSort] = useState<ModelSort>("model_asc");
+  const [searchSort, setSearchSort] = useState<SearchSort>("relevance");
   const {
     query,
     setQuery,
@@ -30,18 +38,25 @@ export default function BrandRoute() {
     error: searchError,
     searchNow,
     loadMore,
-  } = useDebouncedSearch({ brand });
+  } = useDebouncedSearch({ brand, sort: searchSort });
   const [loadingModels, setLoadingModels] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [totalModels, setTotalModels] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
+
+  useEffect(() => {
+    modelsRef.current = models;
+  }, [models]);
 
   const loadModels = useCallback(
     async (offset = 0) => {
+      if (modelsLoadingRef.current) return;
+      modelsLoadingRef.current = true;
       setLoadingModels(true);
       try {
-      const page = await api.getDevices({ brand, offset });
+        const page = await api.getDevices({ brand, offset, sort: modelSort });
         const nextModels = offset
           ? [...modelsRef.current, ...page.items].slice(0, maximumLoadedModels)
           : page.items;
@@ -59,10 +74,11 @@ export default function BrandRoute() {
             : "Unable to load phone models.",
         );
       } finally {
+        modelsLoadingRef.current = false;
         setLoadingModels(false);
       }
     },
-    [brand],
+    [brand, modelSort],
   );
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -70,7 +86,32 @@ export default function BrandRoute() {
     }, 0);
     return () => clearTimeout(timeout);
   }, [deviceRevision, loadModels]);
+  const refreshBrand = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        api.getDevices({ brand, sort: modelSort }).then((page) => {
+          setModels(page.items);
+          setNextOffset(page.nextOffset);
+          setTotalModels(page.total);
+          setModelsError(null);
+        }),
+        query.trim() ? searchNow() : Promise.resolve(),
+      ]);
+    } catch (reason) {
+      setModelsError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to load phone models.",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [brand, modelSort, query, searchNow]);
   const hasSearchQuery = Boolean(query.trim());
+  const loadNextModels = () => {
+    if (nextOffset !== null) void loadModels(nextOffset);
+  };
   const header = (
     <AppHeader
       eyebrow="PHONE BRAND"
@@ -80,7 +121,21 @@ export default function BrandRoute() {
     />
   );
   return (
-    <Screen header={header}>
+    <Screen
+      header={header}
+      refreshControl={createRefreshControl(refreshing, () => {
+        void refreshBrand();
+      })}
+      onEndReached={
+        hasSearchQuery
+          ? results.hasMore
+            ? loadMore
+            : undefined
+          : nextOffset !== null
+            ? loadNextModels
+            : undefined
+      }
+    >
       <SearchBar
         loading={loadingSearch}
         onChangeText={setQuery}
@@ -94,6 +149,18 @@ export default function BrandRoute() {
       {hasSearchQuery ? (
         <>
           <Text style={commonStyles.sectionTitle}>Search results</Text>
+          <ListToolbar
+            sort={{
+              accessibilityLabel: "Sort brand search results",
+              value: searchSort,
+              onApply: setSearchSort,
+              options: [
+                { label: "Best match", value: "relevance" },
+                { label: "Name: A–Z", value: "name_asc" },
+                { label: "Name: Z–A", value: "name_desc" },
+              ],
+            }}
+          />
           {loadingSearch &&
           !results.devices.length &&
           !results.covers.length ? (
@@ -114,14 +181,7 @@ export default function BrandRoute() {
               }
             />
           ))}
-          {results.hasMore ? (
-            <Button
-              label="Load more results"
-              loading={loadingSearch}
-              onPress={loadMore}
-              variant="secondary"
-            />
-          ) : null}
+          {results.hasMore && loadingSearch ? <LoadingMore /> : null}
           {!loadingSearch &&
           !results.devices.length &&
           !results.covers.length ? (
@@ -134,20 +194,24 @@ export default function BrandRoute() {
       ) : (
         <>
           <Text style={commonStyles.sectionTitle}>{totalModels} models</Text>
+          <ListToolbar
+            sort={{
+              accessibilityLabel: "Sort phone models",
+              value: modelSort,
+              onApply: setModelSort,
+              options: [
+                { label: "Name: A–Z", value: "model_asc" },
+                { label: "Name: Z–A", value: "model_desc" },
+              ],
+            }}
+          />
           {loadingModels && !models.length ? (
             <SkeletonList count={5} variant="deviceWithoutBrand" />
           ) : null}
           {models.map((device, index) => (
             <DeviceRow device={device} key={`${device.id}-${index}`} />
           ))}
-          {nextOffset !== null ? (
-            <Button
-              label="Load more models"
-              loading={loadingModels}
-              onPress={() => void loadModels(nextOffset)}
-              variant="secondary"
-            />
-          ) : null}
+          {nextOffset !== null && loadingModels ? <LoadingMore /> : null}
           {!loadingModels && !models.length && !modelsError ? (
             <EmptyState
               title="No models found"

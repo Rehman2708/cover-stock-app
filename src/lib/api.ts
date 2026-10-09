@@ -79,15 +79,17 @@ export const api = {
   getDashboard: () => request<DashboardData>("/api/dashboard"),
   getCovers: ({
     filter = "all",
+    sort = "recent",
     offset = 0,
     limit = 50,
   }: {
-    filter?: "all" | "in_stock" | "low_stock" | "out_of_stock";
+    filter?: "all" | "in_stock" | "attention" | "low_stock" | "out_of_stock";
+    sort?: "recent" | "quantity_low" | "quantity_high";
     offset?: number;
     limit?: number;
   } = {}) =>
     request<CoverPage>(
-      `/api/covers?stock=${filter}&offset=${offset}&limit=${limit}`,
+      `/api/covers?stock=${filter}&sort=${sort}&offset=${offset}&limit=${limit}`,
     ),
   createCover: (input: CreateCoverInput) =>
     request<Cover>("/api/covers", {
@@ -99,11 +101,17 @@ export const api = {
     request<InventoryTransaction[]>(`/api/covers/${id}/transactions`),
   getDevices: ({
     brand,
+    sort = "model_asc",
     offset = 0,
     limit = 50,
-  }: { brand?: string; offset?: number; limit?: number } = {}) =>
+  }: {
+    brand?: string;
+    sort?: "model_asc" | "model_desc";
+    offset?: number;
+    limit?: number;
+  } = {}) =>
     request<DevicePage>(
-      `/api/devices?offset=${offset}&limit=${limit}${brand ? `&brand=${encodeURIComponent(brand)}` : ""}`,
+      `/api/devices?offset=${offset}&limit=${limit}&sort=${sort}${brand ? `&brand=${encodeURIComponent(brand)}` : ""}`,
     ),
   createDevice: (input: CreateDeviceInput) =>
     request<Device>("/api/devices", {
@@ -132,16 +140,27 @@ export const api = {
   getTransactions: ({
     before,
     query,
+    sort = "newest",
     limit = 50,
-  }: { before?: string; query?: string; limit?: number } = {}) =>
+  }: {
+    before?: string;
+    query?: string;
+    sort?: "newest" | "oldest";
+    limit?: number;
+  } = {}) =>
     request<ActivityPage>(
-      `/api/transactions?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}`,
+      `/api/transactions?limit=${limit}&sort=${sort}${before ? `&before=${encodeURIComponent(before)}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}`,
     ),
   getTransaction: (id: string) =>
     request<InventoryTransaction>(`/api/transactions/${id}`),
-  search: (query: string, brand?: string, offset = 0) =>
+  search: (
+    query: string,
+    brand?: string,
+    offset = 0,
+    sort: "relevance" | "name_asc" | "name_desc" = "relevance",
+  ) =>
     request<SearchResults>(
-      `/api/search?q=${encodeURIComponent(query)}${brand ? `&brand=${encodeURIComponent(brand)}` : ""}&offset=${offset}`,
+      `/api/search?q=${encodeURIComponent(query)}${brand ? `&brand=${encodeURIComponent(brand)}` : ""}&offset=${offset}&sort=${sort}`,
     ),
   updateStock: (
     coverId: string,

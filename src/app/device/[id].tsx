@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -19,7 +21,7 @@ import { DeviceImage } from "../../components/common/DeviceImage";
 import { EmptyState } from "../../components/common/EmptyState";
 import { SearchBar } from "../../components/common/SearchBar";
 import { SkeletonList } from "../../components/common/Skeleton";
-import { Screen } from "../../components/common/Screen";
+import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { StockActions } from "../../components/common/StockActions";
 import {
   type ThemeColors,
@@ -56,6 +58,8 @@ export default function DeviceDetailRoute() {
   const [editImageUrl, setEditImageUrl] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [deviceQuery, setDeviceQuery] = useState("");
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const latestStockMutation = useDataSyncStore(
     (state) => state.latestStockMutation,
   );
@@ -63,13 +67,29 @@ export default function DeviceDetailRoute() {
     (state) => state.publishStockMutation,
   );
   const publishDevice = useDataSyncStore((state) => state.publishDevice);
+  const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
 
+  const loadDevice = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      setDetail(await api.getDevice(id));
+      setError(null);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Unable to load this phone.",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id]);
   useEffect(() => {
     let mounted = true;
     api
       .getDevice(id)
       .then((nextDetail) => {
-        if (mounted) setDetail(nextDetail);
+        if (!mounted) return;
+        setDetail(nextDetail);
+        setError(null);
       })
       .catch((reason: unknown) => {
         if (mounted)
@@ -82,7 +102,7 @@ export default function DeviceDetailRoute() {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [deviceRevision, id]);
   const detail = useMemo(
     () =>
       loadedDetail &&
@@ -109,6 +129,8 @@ export default function DeviceDetailRoute() {
     0;
   const availableRecords =
     detail?.covers.filter((cover) => cover.quantityOnHand > 0).length || 0;
+  const deviceImageUri =
+    detail?.device.images?.primary || detail?.device.images?.back;
   const availableLinkCandidates = useMemo(() => {
     const linkedIds = new Set(
       [detail?.device, ...(detail?.compatibleDevices || [])]
@@ -249,6 +271,10 @@ export default function DeviceDetailRoute() {
             }
           : current,
       );
+      publishDevice({
+        ...detail.device,
+        compatibleDevices: result.compatibleDevices,
+      });
       setLinkPickerOpen(false);
       Alert.alert(
         "Phones linked",
@@ -273,7 +299,7 @@ export default function DeviceDetailRoute() {
       if (!result.linked) {
         Alert.alert(
           "Couldn’t unlink phone",
-          "This compatibility is not managed by this phone link.",
+          "This phone is no longer linked. Refresh and try again.",
         );
         return;
       }
@@ -282,9 +308,14 @@ export default function DeviceDetailRoute() {
           ? { ...current, compatibleDevices: result.compatibleDevices }
           : current,
       );
+      publishDevice({
+        ...detail.device,
+        compatibleDevices: result.compatibleDevices,
+      });
+      await loadDevice();
       Alert.alert(
         "Phone unlinked",
-        `${compatibleDevice.brand} ${compatibleDevice.model} no longer shares compatible-cover availability with this phone. Stock was not changed.`,
+        `${detail.device.brand} ${detail.device.model} kept the shared stock. ${compatibleDevice.brand} ${compatibleDevice.model} now has its own stock record starting at 0.`,
       );
     } catch (reason) {
       Alert.alert(
@@ -309,9 +340,10 @@ export default function DeviceDetailRoute() {
     );
   };
   const confirmUnlink = (compatibleDevice: Device) => {
+    if (!detail) return;
     Alert.alert(
       "Unlink this phone?",
-      `${compatibleDevice.brand} ${compatibleDevice.model} will stop sharing cover availability with this phone. Stock quantities will not change.`,
+      `${detail.device.brand} ${detail.device.model} will keep all ${unitsOnHand} shared unit${unitsOnHand === 1 ? "" : "s"}. ${compatibleDevice.brand} ${compatibleDevice.model} will get a separate stock record starting at 0.`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Unlink phone", style: "destructive", onPress: () => void unlinkDevice(compatibleDevice) },
@@ -323,6 +355,7 @@ export default function DeviceDetailRoute() {
     setRemovingDevice(true);
     try {
       await api.removeDevice(id);
+      publishDevice(detail.device);
       router.back();
     } catch (reason) {
       Alert.alert(
@@ -348,20 +381,44 @@ export default function DeviceDetailRoute() {
 
   if (error)
     return (
-      <Screen header={header}>
+      <Screen
+        header={header}
+        refreshControl={createRefreshControl(refreshing, loadDevice, colors)}
+      >
         <EmptyState title="Couldn’t load this phone" message={error} />
       </Screen>
     );
   if (!detail)
     return (
-      <Screen header={header}>
+      <Screen
+        header={header}
+        refreshControl={createRefreshControl(refreshing, loadDevice, colors)}
+      >
         <SkeletonList variant="deviceDetail" />
       </Screen>
     );
   return (
-    <Screen header={header}>
+    <Screen
+      header={header}
+      refreshControl={createRefreshControl(refreshing, loadDevice, colors)}
+    >
       <View style={styles.summary}>
-        <DeviceImage device={detail.device} showFallbackLabel size={112} />
+        {deviceImageUri ? (
+          <Pressable
+            accessibilityHint="Opens the phone image full screen"
+            accessibilityLabel={`View ${detail.device.brand} ${detail.device.model} image`}
+            accessibilityRole="button"
+            onPress={() => setImagePreviewOpen(true)}
+            style={({ pressed }) => [styles.imageButton, pressed && styles.pressed]}
+          >
+            <DeviceImage device={detail.device} showFallbackLabel size={152} />
+            <View pointerEvents="none" style={styles.imageTapHint}>
+              <Text style={styles.imageTapHintLabel}>Tap to view</Text>
+            </View>
+          </Pressable>
+        ) : (
+          <DeviceImage device={detail.device} showFallbackLabel size={152} />
+        )}
         <View style={styles.summaryCopy}>
           <Text style={styles.label}>COVER AVAILABILITY</Text>
           <Text style={styles.count}>
@@ -429,7 +486,7 @@ export default function DeviceDetailRoute() {
                 <View style={styles.sheetCopy}>
                   <Text style={styles.sheetTitle}>Link compatible phone</Text>
                   <Text style={styles.sheetCaption}>
-                    Search the catalogue and select any phone that uses the same cover.
+                    Search {detail.device.brand} phones only. Other brands cannot share a cover.
                   </Text>
                 </View>
                 <Pressable
@@ -445,7 +502,7 @@ export default function DeviceDetailRoute() {
               <SearchBar
                 loading={loadingLinkCandidates}
                 onChangeText={setDeviceQuery}
-                placeholder="Search phone model"
+                placeholder={`Search ${detail.device.brand} phone model`}
                 value={deviceQuery}
               />
               <ScrollView
@@ -537,7 +594,7 @@ export default function DeviceDetailRoute() {
                     </View>
                   ) : (
                     <Text style={styles.emptyCandidates}>
-                      No unlinked phones match that search.
+                      No unlinked {detail.device.brand} phones match that search.
                     </Text>
                   )
                 ) : null}
@@ -637,6 +694,39 @@ export default function DeviceDetailRoute() {
           variant="ghost"
         />
       </BottomSheetModal>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setImagePreviewOpen(false)}
+        presentationStyle="fullScreen"
+        statusBarTranslucent
+        visible={imagePreviewOpen && Boolean(deviceImageUri)}
+      >
+        <View style={styles.imagePreview}>
+          <Pressable
+            accessibilityLabel="Close full screen image"
+            accessibilityRole="button"
+            hitSlop={12}
+            onPress={() => setImagePreviewOpen(false)}
+            style={({ pressed }) => [
+              styles.imagePreviewClose,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.imagePreviewCloseLabel}>×</Text>
+          </Pressable>
+          {deviceImageUri ? (
+            <Image
+              accessibilityLabel={`${detail.device.brand} ${detail.device.model}`}
+              resizeMode="contain"
+              source={{ uri: deviceImageUri }}
+              style={styles.imagePreviewImage}
+            />
+          ) : null}
+          <Text style={styles.imagePreviewCaption}>
+            {detail.device.brand} {detail.device.model}
+          </Text>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -651,6 +741,50 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     gap: spacing.md,
     padding: spacing.md,
+  },
+  imageButton: { height: 152, position: "relative", width: 152 },
+  imageTapHint: {
+    alignSelf: "center",
+    backgroundColor: colors.ink,
+    borderRadius: radius.pill,
+    bottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    position: "absolute",
+  },
+  imageTapHintLabel: { color: colors.white, fontSize: 11, fontWeight: "800" },
+  imagePreview: {
+    backgroundColor: colors.black,
+    flex: 1,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xxxl,
+  },
+  imagePreviewClose: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderRadius: radius.pill,
+    height: 44,
+    justifyContent: "center",
+    position: "absolute",
+    right: spacing.lg,
+    top: spacing.xxl,
+    width: 44,
+    zIndex: 1,
+  },
+  imagePreviewCloseLabel: {
+    color: colors.white,
+    fontSize: 32,
+    fontWeight: "400",
+    lineHeight: 34,
+  },
+  imagePreviewImage: { flex: 1, width: "100%" },
+  imagePreviewCaption: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "800",
+    paddingTop: spacing.md,
+    textAlign: "center",
   },
   summaryCopy: { flex: 1, gap: 4 },
   label: {

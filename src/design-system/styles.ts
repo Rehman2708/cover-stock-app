@@ -6,7 +6,9 @@ export const commonStyles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.md,
     // Leaves clear space above the floating bottom tabs on every scrollable screen.
-    paddingBottom: spacing.xxxl * 3 + spacing.sm,
+    // The floating tab bar sits over content while scrolling. This leaves the
+    // final row fully visible once the list reaches the end.
+    paddingBottom: spacing.xxxl * 4 + spacing.md,
     gap: spacing.md,
   },
   title: {

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -11,7 +11,7 @@ import {
 import { AppHeader } from "../../components/common/AppHeader";
 import { BottomSheetModal } from "../../components/common/BottomSheetModal";
 import { Button } from "../../components/common/Button";
-import { Screen } from "../../components/common/Screen";
+import { Screen, createRefreshControl } from "../../components/common/Screen";
 import {
   useTheme,
   type ThemeColors,
@@ -22,6 +22,7 @@ import {
   changePassword,
   updateProfile,
 } from "../../features/profile/profileApi";
+import { api } from "../../lib/api";
 
 export default function ProfileRoute() {
   const { user, updateUser, logout } = useAuth();
@@ -38,6 +39,26 @@ export default function ProfileRoute() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshProfile = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const refreshedUser = await api.getMe();
+      setName(refreshedUser.name);
+      if (!nameSheetOpen) setNameDraft(refreshedUser.name);
+      updateUser(refreshedUser);
+      setError(null);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to refresh your profile.",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [nameSheetOpen, updateUser]);
 
   const saveName = async () => {
     setError(null);
@@ -152,6 +173,7 @@ export default function ProfileRoute() {
           subtitle="Manage your personal details and sign-in security."
         />
       }
+      refreshControl={createRefreshControl(refreshing, refreshProfile, colors)}
     >
       <View style={styles.profileCard}>
         <View style={styles.avatar}>

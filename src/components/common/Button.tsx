@@ -5,12 +5,14 @@ import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
 import { radius, spacing } from "../../design-system/tokens";
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+type ButtonSize = "regular" | "compact";
 interface ButtonProps {
   label: string;
   onPress: (event: GestureResponderEvent) => void;
   variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
+  size?: ButtonSize;
 }
 export function Button({
   label,
@@ -18,6 +20,7 @@ export function Button({
   variant = "primary",
   loading = false,
   disabled = false,
+  size = "regular",
 }: ButtonProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -41,6 +44,7 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        size === "compact" && styles.compact,
         backgrounds[variant],
         (pressed || isDisabled) && styles.pressed,
       ]}
@@ -63,6 +67,10 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: radius.md,
       alignItems: "center",
       justifyContent: "center",
+    },
+    compact: {
+      minHeight: 40,
+      paddingHorizontal: spacing.md,
     },
     primary: { backgroundColor: colors.primary },
     secondary: { backgroundColor: colors.primarySoft },

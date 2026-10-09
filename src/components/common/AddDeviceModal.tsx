@@ -24,6 +24,8 @@ interface AddDeviceModalProps {
   brands: DeviceBrand[];
   onClose: () => void;
   onAdded: (device: Device) => void;
+  initialBrand?: string;
+  initialModel?: string;
 }
 
 export function AddDeviceModal({
@@ -31,12 +33,14 @@ export function AddDeviceModal({
   brands,
   onClose,
   onAdded,
+  initialBrand,
+  initialModel,
 }: AddDeviceModalProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const publishDevice = useDataSyncStore((state) => state.publishDevice);
-  const [brand, setBrand] = useState("");
-  const [model, setModel] = useState("");
+  const [brand, setBrand] = useState(() => initialBrand?.trim() ?? "");
+  const [model, setModel] = useState(() => initialModel?.trim() ?? "");
   const [imageUrl, setImageUrl] = useState("");
   const [brandPickerOpen, setBrandPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);

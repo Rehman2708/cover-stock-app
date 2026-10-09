@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import type { DimensionValue, StyleProp, ViewStyle } from "react-native";
 import {
@@ -32,6 +33,13 @@ export function BottomSheetModal({
   height,
   closeAccessibilityLabel = "Close modal",
 }: BottomSheetModalProps) {
+  // A sheet is a new interaction context. Leaving a focused field on the
+  // screen behind it would keep the IME open and shrink/obscure the sheet.
+  // Dismiss it centrally so every picker and form gets the same behaviour.
+  useEffect(() => {
+    if (visible) Keyboard.dismiss();
+  }, [visible]);
+
   const dismiss = () => {
     // Android may otherwise leave the IME visible briefly while the modal is
     // closing, which can leave the next screen with a reduced layout.
@@ -40,6 +48,7 @@ export function BottomSheetModal({
   };
   const content = scrollable ? (
     <ScrollView
+      automaticallyAdjustKeyboardInsets
       contentContainerStyle={styles.scrollContent}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"

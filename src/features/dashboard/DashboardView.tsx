@@ -15,7 +15,12 @@ import type { DashboardData } from "../../types/domain";
 import { router } from "expo-router";
 
 type MetricTone = "neutral" | "warning" | "danger";
-type InventoryFilter = "all" | "in_stock" | "low_stock" | "out_of_stock";
+type InventoryFilter =
+  | "all"
+  | "in_stock"
+  | "attention"
+  | "low_stock"
+  | "out_of_stock";
 function Metric({
   label,
   value,
@@ -79,13 +84,17 @@ export function DashboardView({
             subtitle="Checking your shop inventory."
           />
         }
+        refreshControl={createRefreshControl(loading, refresh, colors)}
       >
         <SkeletonList variant="dashboard" />
       </Screen>
     );
   if (error)
     return (
-      <Screen header={<AppHeader eyebrow="COVERSTOCK" title="Dashboard" />}>
+      <Screen
+        header={<AppHeader eyebrow="COVERSTOCK" title="Dashboard" />}
+        refreshControl={createRefreshControl(loading, refresh, colors)}
+      >
         <EmptyState title="Can’t reach your shop data" message={error} />
         <Button label="Try again" onPress={refresh} />
       </Screen>
@@ -110,7 +119,7 @@ export function DashboardView({
           label="Need attention"
           value={attentionCount}
           tone={attentionCount ? "warning" : "neutral"}
-          filter="low_stock"
+          filter="attention"
         />
       </View>
       <View style={styles.actions}>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -8,7 +8,7 @@ import { DeviceCard } from "../../components/common/DeviceCard";
 import { DeviceImage } from "../../components/common/DeviceImage";
 import { EmptyState } from "../../components/common/EmptyState";
 import { SkeletonList } from "../../components/common/Skeleton";
-import { Screen } from "../../components/common/Screen";
+import { Screen, createRefreshControl } from "../../components/common/Screen";
 import {
   type ThemeColors,
   useTheme,
@@ -30,12 +30,30 @@ export default function ActivityDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [item, setItem] = useState<InventoryTransaction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const loadActivity = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      setItem(await api.getTransaction(id));
+      setError(null);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to load this activity.",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id]);
   useEffect(() => {
     let mounted = true;
     api
       .getTransaction(id)
       .then((nextItem) => {
-        if (mounted) setItem(nextItem);
+        if (!mounted) return;
+        setItem(nextItem);
+        setError(null);
       })
       .catch((reason: unknown) => {
         if (mounted)
@@ -64,18 +82,27 @@ export default function ActivityDetailRoute() {
   );
   if (error)
     return (
-      <Screen header={header}>
+      <Screen
+        header={header}
+        refreshControl={createRefreshControl(refreshing, loadActivity, colors)}
+      >
         <EmptyState title="Couldn’t load this activity" message={error} />
       </Screen>
     );
   if (!item || !meta)
     return (
-      <Screen header={header}>
+      <Screen
+        header={header}
+        refreshControl={createRefreshControl(refreshing, loadActivity, colors)}
+      >
         <SkeletonList variant="activityDetail" />
       </Screen>
     );
   return (
-    <Screen header={header}>
+    <Screen
+      header={header}
+      refreshControl={createRefreshControl(refreshing, loadActivity, colors)}
+    >
       <View style={[styles.hero, { backgroundColor: meta.softColor }]}>
         {item.displayDevice ? (
           <DeviceImage device={item.displayDevice} size={54} />
@@ -98,11 +125,11 @@ export default function ActivityDetailRoute() {
       </View>
       <View style={styles.movement}>
         <Text style={styles.sectionLabel}>
-          {item.type === "compatibility_link" ? "FITMENT CHANGE" : "STOCK MOVEMENT"}
+          {item.type === "compatibility_link" || item.type === "compatibility_unlink" ? "FITMENT CHANGE" : "STOCK MOVEMENT"}
         </Text>
         <View style={styles.movementLine}>
           <Text style={styles.beforeAfter}>{stockTransition(item)}</Text>
-          {item.type !== "compatibility_link" ? (
+          {item.type !== "compatibility_link" && item.type !== "compatibility_unlink" ? (
             <Text style={[styles.delta, { color: meta.color }]}>
               {item.quantityDelta > 0 ? "+" : ""}
               {item.quantityDelta} units
@@ -110,8 +137,10 @@ export default function ActivityDetailRoute() {
           ) : null}
         </View>
         <Text style={styles.movementHint}>
-          {item.type === "compatibility_link"
-            ? "This link changes availability for the selected phone without changing stock."
+          {item.type === "compatibility_link" || item.type === "compatibility_unlink"
+            ? item.type === "compatibility_unlink"
+              ? "The phone that initiated the unlink kept the shared stock; the detached phone started at zero."
+              : "This link changes availability for the selected phone without changing stock."
             : "Quantity before and after this stock record."}
         </Text>
       </View>

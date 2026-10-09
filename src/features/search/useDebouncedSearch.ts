@@ -5,6 +5,7 @@ import type { SearchResults } from "../../types/domain";
 
 const emptyResults = (): SearchResults => ({ covers: [], devices: [] });
 const maximumSearchResults = 60;
+export type SearchSort = "relevance" | "name_asc" | "name_desc";
 
 interface SearchState {
   results: SearchResults;
@@ -19,10 +20,12 @@ interface SearchState {
 export function useDebouncedSearch({
   brand,
   debounceMs = 300,
-}: { brand?: string; debounceMs?: number } = {}) {
+  sort = "relevance",
+}: { brand?: string; debounceMs?: number; sort?: SearchSort } = {}) {
   const latestStockMutation = useDataSyncStore(
     (state) => state.latestStockMutation,
   );
+  const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
   const [query, setQuery] = useState("");
   const [state, setState] = useState<SearchState>({
     results: emptyResults(),
@@ -30,11 +33,12 @@ export function useDebouncedSearch({
     error: null,
   });
   const latestRequest = useRef(0);
+  const handledDeviceRevision = useRef(deviceRevision);
 
   const runSearch = useCallback(
     async (term: string, requestId: number, offset = 0, append = false) => {
       try {
-        const results = await api.search(term, brand, offset);
+        const results = await api.search(term, brand, offset, sort);
         if (latestRequest.current === requestId)
           setState((current) => ({
             results: append
@@ -61,18 +65,20 @@ export function useDebouncedSearch({
           }));
       } catch (reason) {
         if (latestRequest.current === requestId) {
-          setState({
-            results: emptyResults(),
+          setState((current) => ({
+            // A failed later page should leave the results already on screen
+            // intact so the next end-of-list gesture can safely retry.
+            results: append ? current.results : emptyResults(),
             loading: false,
             error:
               reason instanceof Error
                 ? reason.message
                 : "Unable to search the catalogue.",
-          });
+          }));
         }
       }
     },
-    [brand],
+    [brand, sort],
   );
 
   const setSearchQuery = useCallback((nextQuery: string) => {
@@ -91,7 +97,10 @@ export function useDebouncedSearch({
 
     const requestId = latestRequest.current;
     const timeout = setTimeout(() => {
-      if (latestRequest.current === requestId) void runSearch(term, requestId);
+      if (latestRequest.current === requestId) {
+        setState((current) => ({ ...current, loading: true, error: null }));
+        void runSearch(term, requestId);
+      }
     }, debounceMs);
     return () => clearTimeout(timeout);
   }, [debounceMs, query, runSearch]);
@@ -148,6 +157,17 @@ export function useDebouncedSearch({
     setState({ results: emptyResults(), loading: true, error: null });
     await runSearch(term, requestId);
   }, [query, runSearch]);
+
+  // Device edits and compatibility changes alter search cards without creating
+  // a stock mutation. Re-run an active search as soon as that shared revision
+  // changes, rather than making staff pull to refresh for the latest data.
+  useEffect(() => {
+    if (handledDeviceRevision.current === deviceRevision) return;
+    handledDeviceRevision.current = deviceRevision;
+    if (!query.trim()) return;
+    const timeout = setTimeout(() => void searchNow(), 0);
+    return () => clearTimeout(timeout);
+  }, [deviceRevision, query, searchNow]);
 
   const loadMore = useCallback(async () => {
     const term = query.trim();

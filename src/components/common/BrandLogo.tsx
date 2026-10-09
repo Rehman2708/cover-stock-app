@@ -47,7 +47,7 @@ function initials(brand: string) {
 
 export function BrandLogo({
   brand,
-  size = 48,
+  size = 52,
 }: {
   brand: string;
   size?: number;
@@ -59,30 +59,36 @@ export function BrandLogo({
     return (
       <View
         accessibilityLabel={`${brand} logo unavailable`}
-        style={[styles.fallback, { height: size, width: size }]}
+        style={[styles.container, { height: size, width: size }]}
       >
         <Text style={styles.initials}>{initials(brand)}</Text>
       </View>
     );
   return (
-    <Image
+    <View
       accessibilityLabel={`${brand} logo`}
-      onError={() => setFailed(true)}
-      source={{
-        uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-      }}
-      style={[styles.logo, { height: size, width: size }]}
-    />
+      style={[styles.container, { height: size, width: size }]}
+    >
+      <Image
+        onError={() => setFailed(true)}
+        source={{
+          uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+        }}
+        style={styles.logo}
+      />
+    </View>
   );
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  logo: { backgroundColor: colors.surfaceMuted, borderRadius: radius.md },
-  fallback: {
+  container: {
     alignItems: "center",
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
     borderRadius: radius.md,
+    borderWidth: 1,
     justifyContent: "center",
   },
+  logo: { height: 34, width: 34 },
   initials: { color: colors.primary, fontSize: 15, fontWeight: "900" },
 });

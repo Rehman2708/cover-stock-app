@@ -6,7 +6,8 @@ export type TransactionType =
   | "return"
   | "damaged"
   | "opening_balance"
-  | "compatibility_link";
+  | "compatibility_link"
+  | "compatibility_unlink";
 
 export interface Cover {
   id: string;
@@ -43,6 +44,8 @@ export interface DevicePage {
 export interface DeviceBrand {
   brand: string;
   modelCount: number;
+  stockedModelCount?: number;
+  hasStock?: boolean;
 }
 export interface CreateDeviceInput {
   brand: string;

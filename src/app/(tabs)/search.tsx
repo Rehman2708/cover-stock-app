@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { AddDeviceModal } from "../../components/common/AddDeviceModal";
-import { Button } from "../../components/common/Button";
+import { LoadingMore } from "../../components/common/LoadingMore";
 import { BrandLogo } from "../../components/common/BrandLogo";
 import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { FilterChips } from "../../components/common/FilterChips";
+import { ListToolbar } from "../../components/common/ListToolbar";
 import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { SearchBar } from "../../components/common/SearchBar";
@@ -23,9 +25,13 @@ import { useDataSyncStore } from "../../lib/dataSync";
 import {
   InventoryList,
   type InventoryFilter,
+  type InventorySort,
 } from "../../features/inventory/InventoryView";
 import { useInventoryViewModel } from "../../features/inventory/useInventoryViewModel";
-import { useDebouncedSearch } from "../../features/search/useDebouncedSearch";
+import {
+  type SearchSort,
+  useDebouncedSearch,
+} from "../../features/search/useDebouncedSearch";
 import type { DeviceBrand } from "../../types/domain";
 
 type SearchResultFilter = "all" | "devices" | "covers";
@@ -39,13 +45,15 @@ export default function SearchRoute() {
   const mode: InventoryMode = requestedMode === "stock" ? "stock" : "browse";
   const stockFilter: InventoryFilter =
     requestedFilter &&
-    ["all", "in_stock", "low_stock", "out_of_stock"].includes(requestedFilter)
+    ["all", "in_stock", "attention", "low_stock", "out_of_stock"].includes(requestedFilter)
       ? requestedFilter
       : "all";
-  const inventory = useInventoryViewModel(stockFilter);
+  const [stockSort, setStockSort] = useState<InventorySort>("recent");
+  const [searchSort, setSearchSort] = useState<SearchSort>("relevance");
+  const inventory = useInventoryViewModel(stockFilter, stockSort);
   const refreshInventory = inventory.refresh;
   const { query, setQuery, results, loading, error, searchNow, loadMore } =
-    useDebouncedSearch();
+    useDebouncedSearch({ sort: searchSort });
   const [brands, setBrands] = useState<DeviceBrand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [brandError, setBrandError] = useState<string | null>(null);
@@ -129,11 +137,25 @@ export default function SearchRoute() {
     setRefreshing(false);
   }, [loadBrands, query, refreshInventory, searchNow]);
   const hasSearchQuery = Boolean(query.trim());
+  // Older API deployments do not include hasStock, so keep every brand in the
+  // stocked section until the stock-aware response is available.
+  const stockedBrands = brands.filter((brand) => brand.hasStock !== false);
+  const otherBrands = brands.filter((brand) => brand.hasStock === false);
   const noResults =
     hasSearchQuery &&
     !loading &&
     results.covers.length === 0 &&
     results.devices.length === 0;
+  const searchedModel = query.trim();
+  const matchedBrand = brands.find((item) => {
+    const brand = item.brand.toLowerCase();
+    const searched = searchedModel.toLowerCase();
+    return searched === brand || searched.startsWith(`${brand} `);
+  });
+  const initialDeviceBrand = matchedBrand?.brand;
+  const initialDeviceModel = matchedBrand
+    ? searchedModel.slice(matchedBrand.brand.length).trim()
+    : searchedModel;
   const showDevices = resultFilter !== "covers";
   const showCovers = resultFilter !== "devices";
   const header = (
@@ -147,11 +169,51 @@ export default function SearchRoute() {
       }
     />
   );
+  const renderBrandCard = (brand: DeviceBrand, index: number) => (
+    <Pressable
+      accessibilityLabel={`Browse ${brand.brand} models`}
+      accessibilityRole="button"
+      key={`${brand.brand}-${index}`}
+      onPress={() =>
+        router.push({
+          pathname: "/brand/[brand]",
+          params: { brand: brand.brand },
+        })
+      }
+      style={({ pressed }) => [styles.brandCard, pressed && styles.pressed]}
+    >
+      <BrandLogo brand={brand.brand} />
+      <View style={styles.brandCopy}>
+        <Text style={styles.brandName}>{brand.brand}</Text>
+        <Text style={commonStyles.caption}>
+          {brand.hasStock === false ? "No covers in stock" : "Covers available"}
+        </Text>
+      </View>
+      <View style={styles.modelCount}>
+        <Text style={styles.modelCountValue}>
+          {brand.hasStock
+            ? brand.stockedModelCount ?? brand.modelCount
+            : brand.modelCount}
+        </Text>
+        <Text style={styles.modelCountLabel}>models</Text>
+      </View>
+      <Ionicons color={colors.muted} name="chevron-forward" size={20} />
+    </Pressable>
+  );
 
   return (
     <Screen
       header={header}
       refreshControl={createRefreshControl(refreshing, refreshHub, colors)}
+      onEndReached={
+        mode === "stock"
+          ? inventory.nextOffset !== null
+            ? inventory.loadMore
+            : undefined
+          : hasSearchQuery && results.hasMore
+            ? loadMore
+            : undefined
+      }
     >
       <SearchBar
         loading={loading}
@@ -173,7 +235,31 @@ export default function SearchRoute() {
         <>
           <View style={styles.sectionHead}>
             <Text style={commonStyles.sectionTitle}>Live stock</Text>
-            <Text style={commonStyles.caption}>{inventory.total} variants</Text>
+            <ListToolbar
+              filter={{
+                accessibilityLabel: "Filter inventory",
+                value: stockFilter,
+                onApply: (nextFilter) =>
+                  router.setParams({ filter: nextFilter }),
+                options: [
+                  { label: "All", value: "all" },
+                  { label: "Available", value: "in_stock" },
+                  { label: "Need attention", value: "attention" },
+                  { label: "Low stock", value: "low_stock" },
+                  { label: "Out of stock", value: "out_of_stock" },
+                ],
+              }}
+              sort={{
+                accessibilityLabel: "Sort inventory",
+                value: stockSort,
+                onApply: setStockSort,
+                options: [
+                  { label: "Recently updated", value: "recent" },
+                  { label: "Quantity: low to high", value: "quantity_low" },
+                  { label: "Quantity: high to low", value: "quantity_high" },
+                ],
+              }}
+            />
           </View>
           <InventoryList
             {...inventory}
@@ -181,6 +267,9 @@ export default function SearchRoute() {
             onFilterChange={(nextFilter) =>
               router.setParams({ filter: nextFilter })
             }
+            sort={stockSort}
+            onSortChange={setStockSort}
+            showControls={false}
           />
         </>
       ) : (
@@ -191,7 +280,7 @@ export default function SearchRoute() {
           {!hasSearchQuery ? (
             <>
               <View style={styles.sectionHead}>
-                <Text style={commonStyles.sectionTitle}>Browse by brand</Text>
+                <Text style={styles.stockedBrandsTitle}>Browse by brand</Text>
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => setAddDeviceOpen(true)}
@@ -203,39 +292,18 @@ export default function SearchRoute() {
               {loadingBrands ? (
                 <SkeletonList count={5} variant="brand" />
               ) : null}
-              {!loadingBrands && brands.length
-                ? brands.map((brand, index) => (
-                    <Pressable
-                      accessibilityLabel={`Browse ${brand.brand} models`}
-                      accessibilityRole="button"
-                      key={`${brand.brand}-${index}`}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/brand/[brand]",
-                          params: { brand: brand.brand },
-                        })
-                      }
-                      style={({ pressed }) => [
-                        styles.brandCard,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <BrandLogo brand={brand.brand} />
-                      <View style={styles.brandCopy}>
-                        <Text style={styles.brandName}>{brand.brand}</Text>
-                        <Text style={commonStyles.caption}>
-                          Browse all phone models
-                        </Text>
-                      </View>
-                      <View style={styles.modelCount}>
-                        <Text style={styles.modelCountValue}>
-                          {brand.modelCount}
-                        </Text>
-                        <Text style={styles.modelCountLabel}>models</Text>
-                      </View>
-                    </Pressable>
-                  ))
+              {!loadingBrands
+                ? stockedBrands.map(renderBrandCard)
                 : null}
+              {!loadingBrands && otherBrands.length ? (
+                <>
+                  <View style={styles.otherBrandsHeader}>
+                    <Text style={styles.otherBrandsTitle}>Other brands</Text>
+                    <Text style={commonStyles.caption}>No covers in stock yet</Text>
+                  </View>
+                  {otherBrands.map(renderBrandCard)}
+                </>
+              ) : null}
               {!loadingBrands && !brands.length && !brandError ? (
                 <EmptyState
                   title="No phone brands yet"
@@ -246,27 +314,57 @@ export default function SearchRoute() {
           ) : null}
           {noResults ? (
             <EmptyState
+              actionLabel="Add phone model"
               title="Nothing matched"
-              message="Try a different phone model."
+              message="Add this phone to your catalogue, or try a different model."
+              onAction={() => setAddDeviceOpen(true)}
             />
           ) : null}
           {hasSearchQuery && !noResults ? (
-            <FilterChips
-              accessibilityLabel="Filter search results"
-              value={resultFilter}
-              onChange={setResultFilter}
-              options={[
-                {
-                  label: `All (${results.devices.length + results.covers.length})`,
-                  value: "all",
-                },
-                {
-                  label: `Devices (${results.devices.length})`,
-                  value: "devices",
-                },
-                { label: `Covers (${results.covers.length})`, value: "covers" },
-              ]}
-            />
+            <>
+              <View style={styles.sectionHead}>
+                <Text style={commonStyles.sectionTitle}>Search results</Text>
+                <Pressable
+                  accessibilityLabel="Add a phone model"
+                  accessibilityRole="button"
+                  onPress={() => setAddDeviceOpen(true)}
+                  style={({ pressed }) => [
+                    styles.addDeviceLink,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.addDeviceLabel}>Add phone</Text>
+                </Pressable>
+              </View>
+              <ListToolbar
+                filter={{
+                  accessibilityLabel: "Filter search results",
+                  value: resultFilter,
+                  onApply: setResultFilter,
+                  options: [
+                    {
+                      label: `All (${results.devices.length + results.covers.length})`,
+                      value: "all",
+                    },
+                    {
+                      label: `Devices (${results.devices.length})`,
+                      value: "devices",
+                    },
+                    { label: `Covers (${results.covers.length})`, value: "covers" },
+                  ],
+                }}
+                sort={{
+                  accessibilityLabel: "Sort search results",
+                  value: searchSort,
+                  onApply: setSearchSort,
+                  options: [
+                    { label: "Best match", value: "relevance" },
+                    { label: "Name: A–Z", value: "name_asc" },
+                    { label: "Name: Z–A", value: "name_desc" },
+                  ],
+                }}
+              />
+            </>
           ) : null}
           {showDevices && results?.devices.length ? (
             <>
@@ -303,14 +401,7 @@ export default function SearchRoute() {
               ))}
             </>
           ) : null}
-          {results.hasMore ? (
-            <Button
-              label="Load more results"
-              loading={loading}
-              onPress={loadMore}
-              variant="secondary"
-            />
-          ) : null}
+          {results.hasMore && loading ? <LoadingMore /> : null}
           {hasSearchQuery &&
           !noResults &&
           ((resultFilter === "devices" && !results.devices.length) ||
@@ -324,6 +415,9 @@ export default function SearchRoute() {
       )}
       <AddDeviceModal
         brands={brands}
+        initialBrand={hasSearchQuery ? initialDeviceBrand : undefined}
+        initialModel={hasSearchQuery ? initialDeviceModel : undefined}
+        key={`${addDeviceOpen}-${initialDeviceBrand ?? ""}-${initialDeviceModel}`}
         visible={addDeviceOpen}
         onAdded={deviceAdded}
         onClose={() => setAddDeviceOpen(false)}
@@ -338,6 +432,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  stockedBrandsTitle: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 25,
+  },
+  otherBrandsHeader: { gap: 2, marginTop: spacing.sm },
+  otherBrandsTitle: { color: colors.ink, fontSize: 18, fontWeight: "800" },
   error: {
     backgroundColor: colors.dangerSoft,
     borderRadius: radius.md,
@@ -348,15 +450,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   brandCard: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     flexDirection: "row",
     gap: spacing.sm,
     minHeight: 76,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    padding: spacing.sm,
   },
-  brandCopy: { flex: 1 },
+  brandCopy: { flex: 1, gap: 2 },
   brandName: { color: colors.ink, fontSize: 17, fontWeight: "900" },
   modelCount: {
     alignItems: "center",

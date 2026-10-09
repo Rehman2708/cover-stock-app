@@ -10,6 +10,7 @@ import { QuantityStepper } from "./QuantityStepper";
 interface StockActionsProps {
   quantityOnHand: number;
   compact?: boolean;
+  dense?: boolean;
   onUpdate: (
     type: Extract<TransactionType, "sale" | "restock">,
     quantity: number,
@@ -18,6 +19,7 @@ interface StockActionsProps {
 export function StockActions({
   quantityOnHand,
   compact = false,
+  dense = false,
   onUpdate,
 }: StockActionsProps) {
   const styles = useThemedStyles(createStyles);
@@ -95,6 +97,7 @@ export function StockActions({
                   ? open("restock")
                   : setStockOptionsOpen(true)
               }
+              size={dense ? "compact" : "regular"}
               variant={quantityOnHand === 0 ? "primary" : "secondary"}
             />
           </View>
@@ -105,6 +108,7 @@ export function StockActions({
                 disabled={updating}
                 label={quantityOnHand === 0 ? "Add stock for this phone" : "Add stock"}
                 onPress={() => open("restock")}
+                size={dense ? "compact" : "regular"}
                 variant={quantityOnHand === 0 ? "primary" : "secondary"}
               />
             </View>
@@ -114,6 +118,7 @@ export function StockActions({
                   disabled={updating}
                   label="Remove stock"
                   onPress={() => open("sale")}
+                  size={dense ? "compact" : "regular"}
                   variant="ghost"
                 />
               </View>
@@ -201,7 +206,7 @@ export function StockActions({
   );
 }
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  wrap: { gap: spacing.sm },
+  wrap: { gap: spacing.sm, marginTop: spacing.xs },
   actions: { flex: 1, flexDirection: "row", gap: spacing.sm },
   action: { flex: 1 },
   undo: {

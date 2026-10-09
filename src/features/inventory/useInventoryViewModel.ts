@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { api } from "../../lib/api";
 import type { Cover, StockMutation, TransactionType } from "../../types/domain";
 import { useDataSyncStore } from "../../lib/dataSync";
-import type { InventoryFilter } from "./InventoryView";
+import type { InventoryFilter, InventorySort } from "./InventoryView";
 
 const maximumLoadedCovers = 100;
 
@@ -14,17 +14,28 @@ const matchesFilter = (cover: Cover, filter: InventoryFilter) => {
       cover.quantityOnHand > 0 &&
       cover.quantityOnHand <= cover.reorderThreshold
     );
+  if (filter === "attention")
+    return (
+      cover.quantityOnHand === 0 ||
+      (cover.quantityOnHand > 0 &&
+        cover.quantityOnHand <= cover.reorderThreshold)
+    );
   if (filter === "out_of_stock") return cover.quantityOnHand === 0;
   return true;
 };
 
-export function useInventoryViewModel(filter: InventoryFilter = "all") {
+export function useInventoryViewModel(
+  filter: InventoryFilter = "all",
+  sort: InventorySort = "recent",
+) {
   const latestStockMutation = useDataSyncStore(
     (state) => state.latestStockMutation,
   );
   const publishStockMutation = useDataSyncStore(
     (state) => state.publishStockMutation,
   );
+  const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
+  const activeListKey = useRef(`${filter}:${sort}`);
   const [state, setState] = useState<{
     covers: Cover[];
     loading: boolean;
@@ -43,7 +54,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
   const load = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
-      const page = await api.getCovers({ filter });
+      const page = await api.getCovers({ filter, sort });
       setState((current) => ({
         ...current,
         covers: page.items,
@@ -59,7 +70,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
           error instanceof Error ? error.message : "Unable to load inventory.",
       }));
     }
-  }, [filter]);
+  }, [filter, sort]);
   const covers = useMemo(() => {
     if (!latestStockMutation) return state.covers;
     const index = state.covers.findIndex(
@@ -94,10 +105,21 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      const requestedRevision = deviceRevision;
+      const listKey = `${filter}:${sort}`;
+      const listChanged = activeListKey.current !== listKey;
+      activeListKey.current = listKey;
+      setState((current) => ({
+        ...current,
+        covers: listChanged ? [] : current.covers,
+        nextOffset: listChanged ? null : current.nextOffset,
+        loading: true,
+        error: null,
+      }));
       api
-        .getCovers({ filter })
+        .getCovers({ filter, sort })
         .then((page) => {
-          if (active)
+          if (active && requestedRevision === deviceRevision)
             setState((current) => ({
               ...current,
               covers: page.items,
@@ -121,7 +143,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
       return () => {
         active = false;
       };
-    }, [filter]),
+    }, [deviceRevision, filter, sort]),
   );
   const loadMore = useCallback(async () => {
     const offset = state.nextOffset;
@@ -133,7 +155,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
       return;
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
-      const page = await api.getCovers({ filter, offset });
+      const page = await api.getCovers({ filter, sort, offset });
       setState((current) => ({
         ...current,
         covers: [...current.covers, ...page.items].slice(
@@ -157,7 +179,7 @@ export function useInventoryViewModel(filter: InventoryFilter = "all") {
             : "Unable to load more inventory.",
       }));
     }
-  }, [filter, state.covers.length, state.loading, state.nextOffset]);
+  }, [filter, sort, state.covers.length, state.loading, state.nextOffset]);
   const updateStock = useCallback(
     async (
       cover: Cover,

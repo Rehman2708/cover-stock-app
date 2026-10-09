@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
-import { Button } from "../../components/common/Button";
+import { LoadingMore } from "../../components/common/LoadingMore";
 import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
-import { FilterChips } from "../../components/common/FilterChips";
+import { ListToolbar } from "../../components/common/ListToolbar";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { StockActions } from "../../components/common/StockActions";
@@ -13,7 +13,13 @@ import { useTheme } from "../../design-system/ThemeProvider";
 import { colors, spacing } from "../../design-system/tokens";
 import type { Cover, StockMutation, TransactionType } from "../../types/domain";
 
-export type InventoryFilter = "all" | "in_stock" | "low_stock" | "out_of_stock";
+export type InventoryFilter =
+  | "all"
+  | "in_stock"
+  | "attention"
+  | "low_stock"
+  | "out_of_stock";
+export type InventorySort = "recent" | "quantity_low" | "quantity_high";
 export interface InventoryViewProps {
   covers: Cover[];
   loading: boolean;
@@ -32,6 +38,9 @@ export interface InventoryViewProps {
 interface InventoryListProps extends InventoryViewProps {
   filter: InventoryFilter;
   onFilterChange: (filter: InventoryFilter) => void;
+  sort?: InventorySort;
+  onSortChange?: (sort: InventorySort) => void;
+  showControls?: boolean;
 }
 
 export function InventoryList({
@@ -40,10 +49,12 @@ export function InventoryList({
   error,
   changingId: _changingId,
   nextOffset,
-  loadMore,
   updateStock,
   filter,
   onFilterChange,
+  sort,
+  onSortChange,
+  showControls = true,
 }: InventoryListProps) {
   const filteredCovers = useMemo(
     () =>
@@ -56,62 +67,81 @@ export function InventoryList({
             cover.quantityOnHand > 0 &&
             cover.quantityOnHand <= cover.reorderThreshold
           );
+        if (filter === "attention")
+          return (
+            cover.quantityOnHand === 0 ||
+            (cover.quantityOnHand > 0 &&
+              cover.quantityOnHand <= cover.reorderThreshold)
+          );
         if (filter === "out_of_stock") return cover.quantityOnHand === 0;
         return true;
       }),
     [covers, filter],
   );
-  if (loading && !covers.length)
-    return <SkeletonList count={4} variant="coverWithActions" />;
   return (
     <>
+      {showControls ? <ListToolbar
+        filter={{
+          accessibilityLabel: "Filter inventory",
+          value: filter,
+          onApply: onFilterChange,
+          options: [
+            { label: "All", value: "all" },
+            { label: "Available", value: "in_stock" },
+            { label: "Need attention", value: "attention" },
+            { label: "Low stock", value: "low_stock" },
+            { label: "Out of stock", value: "out_of_stock" },
+          ],
+        }}
+        sort={
+          sort && onSortChange
+            ? {
+                accessibilityLabel: "Sort inventory",
+                value: sort,
+                onApply: onSortChange,
+                options: [
+                  { label: "Recently updated", value: "recent" },
+                  { label: "Quantity: low to high", value: "quantity_low" },
+                  { label: "Quantity: high to low", value: "quantity_high" },
+                ],
+              }
+            : undefined
+        }
+      /> : null}
       {error ? (
         <View style={styles.error}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
-      {covers.length ? (
+      {loading && !covers.length ? (
+        <SkeletonList count={4} variant="coverWithActions" />
+      ) : covers.length ? (
         <>
-          <FilterChips
-            accessibilityLabel="Filter inventory"
-            value={filter}
-            onChange={onFilterChange}
-            options={[
-              { label: "All", value: "all" },
-              { label: "Available", value: "in_stock" },
-              { label: "Low stock", value: "low_stock" },
-              { label: "Out of stock", value: "out_of_stock" },
-            ]}
-          />
           {filteredCovers.length ? (
             <>
-              {filteredCovers.map((cover, index) => (
-                <DeviceCard
-                  key={`${cover.id}-${index}`}
-                  cover={cover}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/cover/[id]",
-                      params: { id: cover.id },
-                    })
-                  }
-                >
-                  <StockActions
-                    quantityOnHand={cover.quantityOnHand}
-                    onUpdate={(type, quantity) =>
-                      updateStock(cover, type, quantity)
+              <View style={styles.list}>
+                {filteredCovers.map((cover, index) => (
+                  <DeviceCard
+                    key={`${cover.id}-${index}`}
+                    cover={cover}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/cover/[id]",
+                        params: { id: cover.id },
+                      })
                     }
-                  />
-                </DeviceCard>
-              ))}
-              {nextOffset !== null ? (
-                <Button
-                  label="Load more inventory"
-                  loading={loading}
-                  onPress={loadMore}
-                  variant="secondary"
-                />
-              ) : null}
+                  >
+                    <StockActions
+                      dense
+                      quantityOnHand={cover.quantityOnHand}
+                      onUpdate={(type, quantity) =>
+                        updateStock(cover, type, quantity)
+                      }
+                    />
+                  </DeviceCard>
+                ))}
+              </View>
+              {nextOffset !== null && loading ? <LoadingMore /> : null}
             </>
           ) : (
             <EmptyState
@@ -122,8 +152,12 @@ export function InventoryList({
         </>
       ) : (
         <EmptyState
-          title="No covers yet"
-          message="Add the first cover after importing your India-market device catalogue."
+          title={filter === "all" ? "No covers yet" : "No covers in this filter"}
+          message={
+            filter === "all"
+              ? "Add the first cover after importing your India-market device catalogue."
+              : "Try a different stock status."
+          }
         />
       )}
     </>
@@ -137,7 +171,7 @@ export function InventoryView(props: InventoryViewProps) {
   }>();
   const filter: InventoryFilter =
     requestedFilter &&
-    ["all", "in_stock", "low_stock", "out_of_stock"].includes(requestedFilter)
+    ["all", "in_stock", "attention", "low_stock", "out_of_stock"].includes(requestedFilter)
       ? requestedFilter
       : "all";
   return (
@@ -150,6 +184,7 @@ export function InventoryView(props: InventoryViewProps) {
         />
       }
       refreshControl={createRefreshControl(props.loading, props.refresh, colors)}
+      onEndReached={props.nextOffset !== null ? props.loadMore : undefined}
     >
       <InventoryList
         {...props}
@@ -163,6 +198,7 @@ export function InventoryView(props: InventoryViewProps) {
 }
 
 const styles = StyleSheet.create({
+  list: { gap: spacing.lg, marginTop: spacing.xs },
   error: {
     padding: spacing.md,
     backgroundColor: colors.dangerSoft,

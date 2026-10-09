@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -15,7 +15,8 @@ import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { FilterChips } from "../../components/common/FilterChips";
-import { Screen } from "../../components/common/Screen";
+import { ListToolbar } from "../../components/common/ListToolbar";
+import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { StockActions } from "../../components/common/StockActions";
 import { QuantityStepper } from "../../components/common/QuantityStepper";
 import { BottomSheetModal } from "../../components/common/BottomSheetModal";
@@ -49,12 +50,32 @@ export default function CoverDetailRoute() {
     "increase" | "decrease"
   >("increase");
   const [adjustmentReason, setAdjustmentReason] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const latestStockMutation = useDataSyncStore(
     (state) => state.latestStockMutation,
   );
   const publishStockMutation = useDataSyncStore(
     (state) => state.publishStockMutation,
   );
+
+  const loadCover = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [nextCover, nextTransactions] = await Promise.all([
+        api.getCover(id),
+        api.getCoverTransactions(id),
+      ]);
+      setCover(nextCover);
+      setTransactions(nextTransactions);
+      setError(null);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Unable to load this cover.",
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     let mounted = true;
@@ -63,6 +84,7 @@ export default function CoverDetailRoute() {
         if (!mounted) return;
         setCover(nextCover);
         setTransactions(nextTransactions);
+        setError(null);
       })
       .catch((reason: unknown) => {
         if (mounted)
@@ -165,18 +187,27 @@ export default function CoverDetailRoute() {
   };
   if (error)
     return (
-      <Screen header={header}>
+      <Screen
+        header={header}
+        refreshControl={createRefreshControl(refreshing, loadCover, colors)}
+      >
         <EmptyState title="Couldn’t load this cover" message={error} />
       </Screen>
     );
   if (!cover)
     return (
-      <Screen header={header}>
+      <Screen
+        header={header}
+        refreshControl={createRefreshControl(refreshing, loadCover, colors)}
+      >
         <SkeletonList variant="coverDetail" />
       </Screen>
     );
   return (
-    <Screen header={header}>
+    <Screen
+      header={header}
+      refreshControl={createRefreshControl(refreshing, loadCover, colors)}
+    >
       <View style={styles.stockCard}>
         <View>
           <Text style={styles.label}>AVAILABLE NOW</Text>
@@ -221,20 +252,26 @@ export default function CoverDetailRoute() {
           )}
         </View>
       )}
-      <Text style={commonStyles.sectionTitle}>Stock history</Text>
+      <View style={styles.historyHeader}>
+        <Text style={commonStyles.sectionTitle}>Stock history</Text>
+        {visibleTransactions.length ? (
+          <ListToolbar
+            filter={{
+              accessibilityLabel: "Filter stock history",
+              value: historyFilter,
+              onApply: setHistoryFilter,
+              options: [
+                { label: "All activity", value: "all" },
+                { label: "Sales", value: "sale" },
+                { label: "Restocks", value: "restock" },
+                { label: "Adjustments", value: "adjustment" },
+              ],
+            }}
+          />
+        ) : null}
+      </View>
       {visibleTransactions.length ? (
         <>
-          <FilterChips
-            accessibilityLabel="Filter stock history"
-            value={historyFilter}
-            onChange={setHistoryFilter}
-            options={[
-              { label: "All", value: "all" },
-              { label: "Sales", value: "sale" },
-              { label: "Restocks", value: "restock" },
-              { label: "Adjustments", value: "adjustment" },
-            ]}
-          />
           {filteredTransactions.length ? (
             filteredTransactions.map((transaction, index) => (
               <Pressable
@@ -367,6 +404,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "700",
+  },
+  historyHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   history: {
     ...commonStyles.card,

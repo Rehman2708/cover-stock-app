@@ -4,6 +4,7 @@ import type { InventoryTransaction } from "../../types/domain";
 import { useDataSyncStore } from "../../lib/dataSync";
 
 const maximumLoadedActivity = 100;
+export type ActivitySort = "newest" | "oldest";
 
 export function useActivityViewModel() {
   const cachedActivity = useDataSyncStore((state) => state.activity);
@@ -12,6 +13,7 @@ export function useActivityViewModel() {
     (state) => state.latestStockMutation,
   );
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<ActivitySort>("newest");
   const [state, setState] = useState<{
     items: InventoryTransaction[];
     loading: boolean;
@@ -22,7 +24,7 @@ export function useActivityViewModel() {
     async (activeQuery = query) => {
       setState((current) => ({ ...current, loading: true, error: null }));
       try {
-        const page = await api.getTransactions({ query: activeQuery });
+        const page = await api.getTransactions({ query: activeQuery, sort });
         if (!activeQuery) cacheActivity(page.items);
         setState({
           items: page.items,
@@ -40,14 +42,15 @@ export function useActivityViewModel() {
         });
       }
     },
-    [cacheActivity, query],
+    [cacheActivity, query, sort],
   );
   useEffect(() => {
     let active = true;
     const timeout = setTimeout(
       () => {
+        setState((current) => ({ ...current, loading: true, error: null }));
         api
-          .getTransactions({ query })
+          .getTransactions({ query, sort })
           .then((page) => {
             if (!query) cacheActivity(page.items);
             if (active)
@@ -77,7 +80,7 @@ export function useActivityViewModel() {
       active = false;
       clearTimeout(timeout);
     };
-  }, [cacheActivity, query]);
+  }, [cacheActivity, query, sort]);
   const items = useMemo(
     () =>
       latestStockMutation && !query.trim()
@@ -101,6 +104,7 @@ export function useActivityViewModel() {
     try {
       const page = await api.getTransactions({
         query,
+          sort,
         before: state.nextCursor,
       });
       setState((current) => {
@@ -126,12 +130,14 @@ export function useActivityViewModel() {
             : "Unable to load older activity.",
       }));
     }
-  }, [query, state.items.length, state.loading, state.nextCursor]);
+  }, [query, sort, state.items.length, state.loading, state.nextCursor]);
   return {
     ...state,
     items,
     query,
     setQuery,
+    sort,
+    setSort,
     refresh: () => load(),
     loadMore,
   };

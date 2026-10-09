@@ -73,22 +73,21 @@ export function DeviceCard({
     : displayedQuantity > 0
       ? `${displayedQuantity} ${displayedQuantity === 1 ? "cover" : "covers"} available`
       : "Out of stock";
-  const cardMeta =
-    meta ||
-    (cover ? (
-      <>
-        <StockBadge cover={cover} />
-        {compatibleCount ? (
-          <Text style={styles.compatibility}>
-            Fits {compatibleCount} {compatibleCount === 1 ? "phone" : "phones"}
-          </Text>
-        ) : null}
-      </>
-    ) : null);
+  const cardMeta = meta ?? null;
+  const inlineCoverMeta = cover && !meta ? (
+    <View style={styles.inlineMeta}>
+      <StockBadge cover={cover} />
+      {compatibleCount ? (
+        <Text style={styles.compatibility}>
+          Fits {compatibleCount} {compatibleCount === 1 ? "phone" : "phones"}
+        </Text>
+      ) : null}
+    </View>
+  ) : null;
   const content = (
     <>
       <View style={styles.top}>
-        <DeviceImage device={displayedDevice} />
+        <DeviceImage device={displayedDevice} size={48} />
         <View style={styles.copy}>
           {showDeviceBrand ? (
             <Text style={styles.brand}>{displayedDevice.brand}</Text>
@@ -103,6 +102,7 @@ export function DeviceCard({
               {displayedFitCount === 1 ? "phone" : "phones"}
             </Text>
           ) : null}
+          {inlineCoverMeta}
         </View>
         {hasKnownAvailability ? (
           <View
@@ -157,8 +157,7 @@ export function DeviceCard({
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
     ...commonStyles.card,
-    gap: spacing.sm,
-    minHeight: 76,
+    minHeight: 80,
     paddingVertical: spacing.sm,
   },
   pressable: { gap: spacing.sm },
@@ -171,9 +170,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.8,
   },
-  model: { color: colors.ink, fontSize: 16, fontWeight: "900" },
+  model: { color: colors.ink, fontSize: 17, fontWeight: "900", lineHeight: 20 },
   availability: { color: colors.muted, fontSize: 13 },
   compatibility: { color: colors.muted, fontSize: 12, fontWeight: "700" },
+  inlineMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.xxs,
+  },
   meta: {
     alignItems: "center",
     flexDirection: "row",

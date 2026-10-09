@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
 import { radius, spacing } from "../../design-system/tokens";
 
@@ -12,6 +12,7 @@ interface FilterChipsProps<T extends string> {
   value: T;
   options: FilterOption<T>[];
   onChange: (value: T) => void;
+  wrap?: boolean;
 }
 
 export function FilterChips<T extends string>({
@@ -19,9 +20,37 @@ export function FilterChips<T extends string>({
   value,
   options,
   onChange,
+  wrap = false,
 }: FilterChipsProps<T>) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const chips = options.map((option) => {
+    const selected = option.value === value;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        key={option.value}
+        onPress={() => onChange(option.value)}
+        style={({ pressed }) => [
+          styles.chip,
+          selected && styles.chipSelected,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={[styles.label, selected && styles.labelSelected]}>
+          {option.label}
+        </Text>
+      </Pressable>
+    );
+  });
+  if (wrap) {
+    return (
+      <View accessibilityLabel={accessibilityLabel} style={styles.wrapContent}>
+        {chips}
+      </View>
+    );
+  }
   return (
     <ScrollView
       accessibilityLabel={accessibilityLabel}
@@ -29,33 +58,17 @@ export function FilterChips<T extends string>({
       horizontal
       showsHorizontalScrollIndicator={false}
     >
-      {options.map((option) => {
-        const selected = option.value === value;
-        return (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            key={option.value}
-            onPress={() => onChange(option.value)}
-            style={({ pressed }) => [
-              styles.chip,
-              selected && styles.chipSelected,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={[styles.label, selected && styles.labelSelected]}>
-              {option.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {chips}
     </ScrollView>
   );
 }
 
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    content: { gap: spacing.xs, paddingRight: spacing.lg },
+    // Extra trailing space makes the final option fully reachable and signals
+    // that the row can scroll when there are more filters than fit on screen.
+    content: { gap: spacing.xs, paddingRight: spacing.xxxl },
+    wrapContent: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
     chip: {
       backgroundColor: colors.surface,
       borderColor: colors.border,

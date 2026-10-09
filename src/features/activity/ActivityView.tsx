@@ -4,10 +4,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";
-import { Button } from "../../components/common/Button";
+import { LoadingMore } from "../../components/common/LoadingMore";
 import { EmptyState } from "../../components/common/EmptyState";
 import { SkeletonList } from "../../components/common/Skeleton";
-import { FilterChips } from "../../components/common/FilterChips";
+import { ListToolbar } from "../../components/common/ListToolbar";
 import { SearchBar } from "../../components/common/SearchBar";
 import { Screen, createRefreshControl } from "../../components/common/Screen";
 import {
@@ -24,6 +24,7 @@ import {
   stockTransition,
 } from "./activityPresentation";
 import type { InventoryTransaction } from "../../types/domain";
+import type { ActivitySort } from "./useActivityViewModel";
 
 interface ActivityViewProps {
   items: InventoryTransaction[];
@@ -31,6 +32,8 @@ interface ActivityViewProps {
   error: string | null;
   query: string;
   setQuery: (query: string) => void;
+  sort: ActivitySort;
+  setSort: (sort: ActivitySort) => void;
   nextCursor: string | null;
   refresh: () => Promise<void>;
   loadMore: () => Promise<void>;
@@ -52,6 +55,8 @@ export function ActivityView({
   error,
   query,
   setQuery,
+  sort,
+  setSort,
   nextCursor,
   refresh,
   loadMore,
@@ -63,7 +68,17 @@ export function ActivityView({
     () => items.filter((item) => matchesFilter(item, filter)),
     [filter, items],
   );
-  const recentDate = items[0]?.createdAt;
+  const recentDate = useMemo(
+    () =>
+      items.reduce<string | undefined>(
+        (latest, item) =>
+          !latest || new Date(item.createdAt) > new Date(latest)
+            ? item.createdAt
+            : latest,
+        undefined,
+      ),
+    [items],
+  );
   const dayItems = useMemo(
     () =>
       recentDate
@@ -118,7 +133,10 @@ export function ActivityView({
   );
   if (loading && !items.length)
     return (
-      <Screen header={header}>
+      <Screen
+        header={header}
+        refreshControl={createRefreshControl(loading, refresh, colors)}
+      >
         <SearchBar
           loading
           onChangeText={setQuery}
@@ -127,16 +145,11 @@ export function ActivityView({
           placeholder="Search phone history"
           value={query}
         />
-        <FilterChips
-          accessibilityLabel="Filter activity"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { label: "All", value: "all" },
-            { label: "Sales", value: "sales" },
-            { label: "Stock in", value: "stock_in" },
-            { label: "Corrections", value: "corrections" },
-          ]}
+        <ActivityToolbar
+          filter={filter}
+          onFilterChange={setFilter}
+          onSortChange={setSort}
+          sort={sort}
         />
         <SkeletonList variant="activity" count={5} />
       </Screen>
@@ -145,6 +158,7 @@ export function ActivityView({
     <Screen
       header={header}
       refreshControl={createRefreshControl(loading, refresh, colors)}
+      onEndReached={nextCursor ? loadMore : undefined}
     >
       {error ? (
         <View style={styles.error}>
@@ -161,16 +175,11 @@ export function ActivityView({
       />
       {items.length ? (
         <>
-          <FilterChips
-            accessibilityLabel="Filter activity"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { label: "All", value: "all" },
-              { label: "Sales", value: "sales" },
-              { label: "Stock in", value: "stock_in" },
-              { label: "Corrections", value: "corrections" },
-            ]}
+          <ActivityToolbar
+            filter={filter}
+            onFilterChange={setFilter}
+            onSortChange={setSort}
+            sort={sort}
           />
           <View
             style={styles.summary}
@@ -206,14 +215,7 @@ export function ActivityView({
                   </View>
                 </View>
               ))}
-              {nextCursor ? (
-                <Button
-                  label="Load older activity"
-                  loading={loading}
-                  onPress={loadMore}
-                  variant="secondary"
-                />
-              ) : null}
+              {nextCursor && loading ? <LoadingMore /> : null}
             </>
           ) : (
             <EmptyState
@@ -229,6 +231,43 @@ export function ActivityView({
         />
       )}
     </Screen>
+  );
+}
+
+function ActivityToolbar({
+  filter,
+  onFilterChange,
+  sort,
+  onSortChange,
+}: {
+  filter: ActivityFilter;
+  onFilterChange: (filter: ActivityFilter) => void;
+  sort: ActivitySort;
+  onSortChange: (sort: ActivitySort) => void;
+}) {
+  return (
+    <ListToolbar
+      filter={{
+        accessibilityLabel: "Filter activity",
+        value: filter,
+        onApply: onFilterChange,
+        options: [
+          { label: "All activity", value: "all" },
+          { label: "Sales", value: "sales" },
+          { label: "Stock in", value: "stock_in" },
+          { label: "Corrections", value: "corrections" },
+        ],
+      }}
+      sort={{
+        accessibilityLabel: "Sort activity",
+        value: sort,
+        onApply: onSortChange,
+        options: [
+          { label: "Newest first", value: "newest" },
+          { label: "Oldest first", value: "oldest" },
+        ],
+      }}
+    />
   );
 }
 
@@ -295,8 +334,8 @@ function ActivityRow({
       </View>
       <View style={styles.movement}>
         <Text style={[styles.delta, { color: meta.color }]}>
-          {item.type === "compatibility_link"
-            ? "Linked"
+          {item.type === "compatibility_link" || item.type === "compatibility_unlink"
+            ? item.type === "compatibility_link" ? "Linked" : "Unlinked"
             : `${item.quantityDelta > 0 ? "+" : ""}${item.quantityDelta}`}
         </Text>
         <Text style={styles.transition}>{stockTransition(item)}</Text>

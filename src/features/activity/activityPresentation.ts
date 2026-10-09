@@ -60,6 +60,12 @@ export function activityMeta(
       color: colors.primary,
       softColor: colors.primarySoft,
     },
+    compatibility_unlink: {
+      label: "Phone unlinked",
+      icon: "unlink-outline",
+      color: colors.warning,
+      softColor: colors.warningSoft,
+    },
   };
   return values[type];
 }
@@ -73,6 +79,7 @@ export function activityNote(item: InventoryTransaction) {
   if (item.type === "damaged") return "Damaged stock removed";
   if (item.type === "opening_balance") return "Starting quantity";
   if (item.type === "compatibility_link") return "Compatible phone linked";
+  if (item.type === "compatibility_unlink") return "Compatible phone unlinked";
   return "Stock count correction";
 }
 
@@ -106,6 +113,7 @@ export function activityTime(value: string) {
 
 export function stockTransition(item: InventoryTransaction) {
   if (item.type === "compatibility_link") return "Fitment linked";
+  if (item.type === "compatibility_unlink") return "Fitment unlinked";
   if (
     Number.isInteger(item.quantityBefore) &&
     Number.isInteger(item.quantityAfter)
