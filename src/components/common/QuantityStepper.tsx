@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius } from "../../design-system/tokens";
+import { type ThemeColors, useThemedStyles } from "../../design-system/ThemeProvider";
+import { radius } from "../../design-system/tokens";
 
 interface QuantityStepperProps {
   value: number;
@@ -13,6 +14,7 @@ export function QuantityStepper({
   minimum = 1,
   maximum,
 }: QuantityStepperProps) {
+  const styles = useThemedStyles(createStyles);
   const cannotIncrease = maximum !== undefined && value >= maximum;
   return (
     <View accessibilityLabel="Stock quantity" style={styles.wrap}>
@@ -46,7 +48,7 @@ export function QuantityStepper({
     </View>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: {
     alignItems: "center",
     flexDirection: "row",

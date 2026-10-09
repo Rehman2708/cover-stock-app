@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { colors, radius } from "../../design-system/tokens";
+import { type ThemeColors, useThemedStyles } from "../../design-system/ThemeProvider";
+import { radius } from "../../design-system/tokens";
 
 const brandDomains: Record<string, string> = {
   apple: "apple.com",
@@ -51,6 +52,7 @@ export function BrandLogo({
   brand: string;
   size?: number;
 }) {
+  const styles = useThemedStyles(createStyles);
   const [failed, setFailed] = useState(false);
   const domain = brandDomains[brand.trim().toLocaleLowerCase()];
   if (!domain || failed)
@@ -74,7 +76,7 @@ export function BrandLogo({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   logo: { backgroundColor: colors.surfaceMuted, borderRadius: radius.md },
   fallback: {
     alignItems: "center",

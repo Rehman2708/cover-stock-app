@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,9 +10,14 @@ import {
 import { api } from "../../lib/api";
 import { useDataSyncStore } from "../../lib/dataSync";
 import type { Device, DeviceBrand } from "../../types/domain";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import { Button } from "./Button";
-import { KeyboardAwareBottomSheet } from "./KeyboardAwareBottomSheet";
+import { BottomSheetModal } from "./BottomSheetModal";
 
 interface AddDeviceModalProps {
   visible: boolean;
@@ -28,9 +32,12 @@ export function AddDeviceModal({
   onClose,
   onAdded,
 }: AddDeviceModalProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const publishDevice = useDataSyncStore((state) => state.publishDevice);
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [brandPickerOpen, setBrandPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +54,12 @@ export function AddDeviceModal({
       const device = await api.createDevice({
         brand: brand.trim(),
         model: model.trim(),
+        imageUrl: imageUrl.trim() || undefined,
       });
       publishDevice(device);
       setBrand("");
       setModel("");
+      setImageUrl("");
       setBrandPickerOpen(false);
       onAdded(device);
     } catch (reason) {
@@ -62,15 +71,7 @@ export function AddDeviceModal({
     }
   };
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={close}
-      transparent
-      visible={visible}
-    >
-      <View style={styles.backdrop}>
-        <KeyboardAwareBottomSheet>
-          <View style={styles.sheet}>
+    <BottomSheetModal contentStyle={styles.sheet} onClose={close} scrollable visible={visible}>
             <View style={styles.handle} />
             <Text style={styles.eyebrow}>MANUAL DEVICE ENTRY</Text>
             <Text style={styles.title}>Add a device</Text>
@@ -167,6 +168,14 @@ export function AddDeviceModal({
               placeholder="For example, Phone (2a)"
               autoCapitalize="words"
             />
+            <Field
+              label="Image URL (optional)"
+              value={imageUrl}
+              onChangeText={setImageUrl}
+              placeholder="https://example.com/phone.jpg"
+              autoCapitalize="none"
+              keyboardType="url"
+            />
             {error ? (
               <Text accessibilityLiveRegion="polite" style={styles.error}>
                 {error}
@@ -179,16 +188,12 @@ export function AddDeviceModal({
               onPress={save}
             />
             <Button
-              compact
               disabled={saving}
               label="Cancel"
               onPress={close}
               variant="ghost"
             />
-          </View>
-        </KeyboardAwareBottomSheet>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
@@ -196,6 +201,8 @@ function Field({
   label,
   ...props
 }: { label: string } & React.ComponentProps<typeof TextInput>) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -210,7 +217,7 @@ function Field({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backdrop: {
     backgroundColor: "rgba(21, 35, 31, .35)",
     flex: 1,

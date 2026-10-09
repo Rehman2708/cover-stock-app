@@ -5,7 +5,6 @@ import { AppHeader } from "../../components/common/AppHeader";
 import { AddDeviceModal } from "../../components/common/AddDeviceModal";
 import { Button } from "../../components/common/Button";
 import { BrandLogo } from "../../components/common/BrandLogo";
-import { CoverCard } from "../../components/common/CoverCard";
 import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { FilterChips } from "../../components/common/FilterChips";
@@ -13,7 +12,12 @@ import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { SearchBar } from "../../components/common/SearchBar";
 import { commonStyles } from "../../design-system/styles";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import { api } from "../../lib/api";
 import { useDataSyncStore } from "../../lib/dataSync";
 import {
@@ -28,6 +32,8 @@ type SearchResultFilter = "all" | "devices" | "covers";
 type InventoryMode = "browse" | "stock";
 
 export default function SearchRoute() {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { mode: requestedMode, filter: requestedFilter } =
     useLocalSearchParams<{ mode?: InventoryMode; filter?: InventoryFilter }>();
   const mode: InventoryMode = requestedMode === "stock" ? "stock" : "browse";
@@ -145,7 +151,7 @@ export default function SearchRoute() {
   return (
     <Screen
       header={header}
-      refreshControl={createRefreshControl(refreshing, refreshHub)}
+      refreshControl={createRefreshControl(refreshing, refreshHub, colors)}
     >
       <SearchBar
         loading={loading}
@@ -269,6 +275,7 @@ export default function SearchRoute() {
                 <DeviceCard
                   device={device}
                   key={`${device.id}-${index}`}
+                  showFitCount
                   onPress={() =>
                     router.push({
                       pathname: "/device/[id]",
@@ -283,7 +290,7 @@ export default function SearchRoute() {
             <>
               <Text style={commonStyles.sectionTitle}>Covers</Text>
               {results.covers.map((cover, index) => (
-                <CoverCard
+                <DeviceCard
                   cover={cover}
                   key={`${cover.id}-${index}`}
                   onPress={() =>
@@ -325,7 +332,7 @@ export default function SearchRoute() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sectionHead: {
     alignItems: "center",
     flexDirection: "row",

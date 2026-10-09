@@ -1,6 +1,8 @@
+import { createContext, useContext } from "react";
 import { StyleSheet, View } from "react-native";
 import { commonStyles } from "../../design-system/styles";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import { type ThemeColors, useThemedStyles } from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 
 export type SkeletonVariant =
   | "activity"
@@ -15,6 +17,15 @@ export type SkeletonVariant =
   | "deviceWithoutBrand"
   | "deviceDetail";
 
+type SkeletonStyles = ReturnType<typeof createStyles>;
+const SkeletonStylesContext = createContext<SkeletonStyles | null>(null);
+
+function useSkeletonStyles() {
+  const styles = useContext(SkeletonStylesContext);
+  if (!styles) throw new Error("Skeleton styles are unavailable.");
+  return styles;
+}
+
 function Block({
   height,
   width = "100%",
@@ -24,12 +35,14 @@ function Block({
   width?: number | `${number}%`;
   pill?: boolean;
 }) {
+  const styles = useSkeletonStyles();
   return (
     <View style={[styles.block, { height, width }, pill && styles.pill]} />
   );
 }
 
 function CoverSkeleton({ withActions = false }: { withActions?: boolean }) {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.coverCard}>
       <View style={styles.coverTop}>
@@ -54,6 +67,7 @@ function CoverSkeleton({ withActions = false }: { withActions?: boolean }) {
 }
 
 function DeviceSkeleton({ showBrand = true }: { showBrand?: boolean }) {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.deviceCard}>
       <View style={styles.deviceImage} />
@@ -71,6 +85,7 @@ function DeviceSkeleton({ showBrand = true }: { showBrand?: boolean }) {
 }
 
 function BrandSkeleton() {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.brandCard}>
       <View style={styles.brandLogo} />
@@ -87,6 +102,7 @@ function BrandSkeleton() {
 }
 
 function ActivitySkeleton({ last = false }: { last?: boolean }) {
+  const styles = useSkeletonStyles();
   return (
     <View style={[styles.activityRow, !last && styles.activityBorder]}>
       <View style={styles.activityIcon} />
@@ -108,6 +124,7 @@ function ActivitySkeleton({ last = false }: { last?: boolean }) {
 }
 
 function CoverHistorySkeleton() {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.coverHistory}>
       <View style={styles.historyDot} />
@@ -122,6 +139,7 @@ function CoverHistorySkeleton() {
 }
 
 function DashboardSkeleton() {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.stack}>
       <View style={styles.metrics}>
@@ -188,6 +206,7 @@ function DashboardSkeleton() {
 }
 
 function CoverDetailSkeleton() {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.stack}>
       <View style={styles.stockCard}>
@@ -225,6 +244,7 @@ function CoverDetailSkeleton() {
 }
 
 function DeviceDetailSkeleton() {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.stack}>
       <View style={styles.deviceSummary}>
@@ -250,6 +270,7 @@ function DeviceDetailSkeleton() {
 }
 
 function ActivityDetailSkeleton() {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.stack}>
       <View style={styles.activityHero}>
@@ -286,6 +307,7 @@ function ActivityDetailSkeleton() {
 }
 
 function ActivityListSkeleton({ count }: { count: number }) {
+  const styles = useSkeletonStyles();
   const rows = Math.max(1, Math.min(count, 5));
   return (
     <View style={styles.stack}>
@@ -311,6 +333,7 @@ function ActivityListSkeleton({ count }: { count: number }) {
 }
 
 function AppSkeleton({ count }: { count: number }) {
+  const styles = useSkeletonStyles();
   return (
     <View style={styles.stack}>
       {Array.from({ length: count }, (_, item) => (
@@ -327,6 +350,7 @@ export function SkeletonList({
   count?: number;
   variant?: SkeletonVariant;
 }) {
+  const styles = useThemedStyles(createStyles);
   const content = (() => {
     if (variant === "dashboard") return <DashboardSkeleton />;
     if (variant === "coverDetail") return <CoverDetailSkeleton />;
@@ -355,14 +379,16 @@ export function SkeletonList({
   })();
 
   return (
-    <View accessibilityLabel="Loading content" accessibilityLiveRegion="polite">
-      {content}
-    </View>
+    <SkeletonStylesContext.Provider value={styles}>
+      <View accessibilityLabel="Loading content" accessibilityLiveRegion="polite">
+        {content}
+      </View>
+    </SkeletonStylesContext.Provider>
   );
 }
 
-const styles = StyleSheet.create({
-  block: { backgroundColor: colors.surfaceMuted, borderRadius: radius.sm },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  block: { backgroundColor: colors.primarySoft, borderRadius: radius.sm },
   pill: { borderRadius: radius.pill },
   stack: { gap: spacing.lg },
   stackTight: { gap: spacing.sm },

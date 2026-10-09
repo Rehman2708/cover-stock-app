@@ -1,6 +1,8 @@
 import type { GestureResponderEvent } from "react-native";
+import { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 interface ButtonProps {
@@ -9,7 +11,6 @@ interface ButtonProps {
   variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
-  compact?: boolean;
 }
 export function Button({
   label,
@@ -17,8 +18,9 @@ export function Button({
   variant = "primary",
   loading = false,
   disabled = false,
-  compact = false,
 }: ButtonProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isDisabled = disabled || loading;
   const backgrounds = {
     primary: styles.primary,
@@ -39,7 +41,6 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        compact && styles.compact,
         backgrounds[variant],
         (pressed || isDisabled) && styles.pressed,
       ]}
@@ -54,23 +55,23 @@ export function Button({
     </Pressable>
   );
 }
-const styles = StyleSheet.create({
-  button: {
-    minHeight: 48,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  compact: { minHeight: 38, paddingHorizontal: spacing.md },
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.primarySoft },
-  danger: { backgroundColor: colors.dangerSoft },
-  ghost: { backgroundColor: colors.surfaceMuted },
-  pressed: { opacity: 0.72 },
-  label: { fontSize: 15, fontWeight: "800" },
-  primaryLabel: { color: colors.white },
-  secondaryLabel: { color: colors.primary },
-  dangerLabel: { color: colors.danger },
-  ghostLabel: { color: colors.ink },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    button: {
+      minHeight: 48,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    primary: { backgroundColor: colors.primary },
+    secondary: { backgroundColor: colors.primarySoft },
+    danger: { backgroundColor: colors.dangerSoft },
+    ghost: { backgroundColor: colors.primarySoft },
+    pressed: { opacity: 0.72 },
+    label: { fontSize: 15, fontWeight: "800" },
+    primaryLabel: { color: colors.white },
+    secondaryLabel: { color: colors.primary },
+    dangerLabel: { color: colors.danger },
+    ghostLabel: { color: colors.primary },
+  });

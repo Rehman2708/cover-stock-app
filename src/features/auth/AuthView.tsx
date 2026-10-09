@@ -3,7 +3,12 @@ import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button } from "../../components/common/Button";
 import { Screen } from "../../components/common/Screen";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import { useAuth } from "./AuthProvider";
 import {
   normalizePhone,
@@ -14,6 +19,7 @@ import {
 } from "./authValidation";
 
 export function AuthView() {
+  const styles = useThemedStyles(createStyles);
   const { login, register } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [name, setName] = useState("");
@@ -161,6 +167,8 @@ function Field({
   error,
   ...props
 }: { label: string; error?: string } & ComponentProps<typeof TextInput>) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -191,6 +199,8 @@ function PasswordField({
   onToggleVisibility: () => void;
   error?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>Password</Text>
@@ -228,7 +238,7 @@ function PasswordField({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: {
     flex: 1,
     justifyContent: "center",

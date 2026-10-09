@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 
 export interface FilterOption<T extends string> {
   label: string;
@@ -18,6 +20,8 @@ export function FilterChips<T extends string>({
   options,
   onChange,
 }: FilterChipsProps<T>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <ScrollView
       accessibilityLabel={accessibilityLabel}
@@ -49,22 +53,23 @@ export function FilterChips<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
-  content: { gap: spacing.xs, paddingRight: spacing.lg },
-  chip: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    minHeight: 36,
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-  },
-  chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  label: { color: colors.muted, fontSize: 14, fontWeight: "800" },
-  labelSelected: { color: colors.white },
-  pressed: { opacity: 0.72 },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    content: { gap: spacing.xs, paddingRight: spacing.lg },
+    chip: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      minHeight: 36,
+      justifyContent: "center",
+      paddingHorizontal: spacing.md,
+    },
+    chipSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    label: { color: colors.muted, fontSize: 14, fontWeight: "800" },
+    labelSelected: { color: colors.white },
+    pressed: { opacity: 0.72 },
+  });

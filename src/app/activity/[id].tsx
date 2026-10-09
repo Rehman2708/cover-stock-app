@@ -4,11 +4,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";
+import { DeviceCard } from "../../components/common/DeviceCard";
 import { DeviceImage } from "../../components/common/DeviceImage";
 import { EmptyState } from "../../components/common/EmptyState";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { Screen } from "../../components/common/Screen";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import { api } from "../../lib/api";
 import {
   activityMeta,
@@ -19,6 +25,8 @@ import {
 import type { InventoryTransaction } from "../../types/domain";
 
 export default function ActivityDetailRoute() {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [item, setItem] = useState<InventoryTransaction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +49,16 @@ export default function ActivityDetailRoute() {
       mounted = false;
     };
   }, [id]);
-  const meta = item ? activityMeta(item.type) : null;
+  const meta = item ? activityMeta(item.type, colors) : null;
   const header = (
     <AppHeader
       eyebrow="ACTIVITY DETAIL"
       title={item && meta ? `${meta.label} recorded` : "Activity details"}
-      subtitle={item?.coverName || "Stock record"}
+      subtitle={
+        item?.displayDevice
+          ? `${item.displayDevice.brand} ${item.displayDevice.model}`
+          : "Phone stock record"
+      }
       left={<BackButton onPress={() => router.back()} />}
     />
   );
@@ -77,22 +89,30 @@ export default function ActivityDetailRoute() {
             {meta.label.toUpperCase()}
           </Text>
           <Text style={styles.heroTitle}>
-            {item.coverName || "Cover no longer available"}
+            {item.displayDevice
+              ? `${item.displayDevice.brand} ${item.displayDevice.model}`
+              : "Phone stock record"}
           </Text>
           <Text style={styles.heroSubtitle}>{activityNote(item)}</Text>
         </View>
       </View>
       <View style={styles.movement}>
-        <Text style={styles.sectionLabel}>STOCK MOVEMENT</Text>
+        <Text style={styles.sectionLabel}>
+          {item.type === "compatibility_link" ? "FITMENT CHANGE" : "STOCK MOVEMENT"}
+        </Text>
         <View style={styles.movementLine}>
           <Text style={styles.beforeAfter}>{stockTransition(item)}</Text>
-          <Text style={[styles.delta, { color: meta.color }]}>
-            {item.quantityDelta > 0 ? "+" : ""}
-            {item.quantityDelta} units
-          </Text>
+          {item.type !== "compatibility_link" ? (
+            <Text style={[styles.delta, { color: meta.color }]}>
+              {item.quantityDelta > 0 ? "+" : ""}
+              {item.quantityDelta} units
+            </Text>
+          ) : null}
         </View>
         <Text style={styles.movementHint}>
-          Quantity before and after this stock record.
+          {item.type === "compatibility_link"
+            ? "This link changes availability for the selected phone without changing stock."
+            : "Quantity before and after this stock record."}
         </Text>
       </View>
       <View style={styles.details}>
@@ -110,15 +130,29 @@ export default function ActivityDetailRoute() {
             activityTime(item.createdAt)
           }
         />
-        <Row label="Cover SKU" value={item.coverSku || "Not recorded"} />
-        {item.compatibleModels?.length ? (
-          <Row label="Fits" value={item.compatibleModels.join(" · ")} />
-        ) : null}
         {item.reason ? <Row label="Reason" value={item.reason} /> : null}
         {item.note && item.note !== "Opening balance" ? (
           <Row label="Note" value={item.note} />
         ) : null}
       </View>
+      {item.compatibleDevices?.length ? (
+        <View style={styles.compatibleDevices}>
+          <Text style={styles.sectionLabel}>COMPATIBLE PHONES</Text>
+          {item.compatibleDevices.map((device) => (
+            <DeviceCard
+              device={device}
+              key={device.id}
+              onPress={() =>
+                router.push({
+                  pathname: "/device/[id]",
+                  params: { id: device.id },
+                })
+              }
+              unavailableCaption="View details"
+            />
+          ))}
+        </View>
+      ) : null}
       {item.coverId ? (
         <Pressable
           accessibilityRole="button"
@@ -138,6 +172,7 @@ export default function ActivityDetailRoute() {
   );
 }
 function Row({ label, value }: { label: string; value: string }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -145,7 +180,7 @@ function Row({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   hero: {
     alignItems: "center",
     borderRadius: radius.lg,
@@ -194,6 +229,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
   },
+  compatibleDevices: { gap: spacing.sm },
   row: {
     flexDirection: "row",
     gap: spacing.md,

@@ -1,11 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
 import { StyleSheet, View } from "react-native";
+import { useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, radius, shadow, spacing } from "../../design-system/tokens";
+import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
+import { radius, shadow, spacing } from "../../design-system/tokens";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Tabs
       screenOptions={{
@@ -75,6 +79,8 @@ function TabIcon({
   focused: boolean;
   name: "grid-outline" | "cube-outline" | "person-outline";
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.iconBadge, focused && styles.iconBadgeActive]}>
       <Ionicons color={color} name={name} size={21} />
@@ -82,7 +88,7 @@ function TabIcon({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   tabBar: {
     ...shadow,
     backgroundColor: colors.surface,

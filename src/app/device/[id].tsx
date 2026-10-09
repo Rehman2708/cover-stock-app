@@ -1,32 +1,68 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";
+import { BottomSheetModal } from "../../components/common/BottomSheetModal";
+import { Button } from "../../components/common/Button";
+import { DeviceCard } from "../../components/common/DeviceCard";
 import { DeviceImage } from "../../components/common/DeviceImage";
 import { EmptyState } from "../../components/common/EmptyState";
+import { SearchBar } from "../../components/common/SearchBar";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { Screen } from "../../components/common/Screen";
 import { StockActions } from "../../components/common/StockActions";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import { api } from "../../lib/api";
 import { useDataSyncStore } from "../../lib/dataSync";
 import type {
+  Device,
   DeviceDetail,
   StockMutation,
   TransactionType,
 } from "../../types/domain";
 
 export default function DeviceDetailRoute() {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loadedDetail, setDetail] = useState<DeviceDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [linkCandidates, setLinkCandidates] = useState<Device[]>([]);
+  const [linkCandidatesError, setLinkCandidatesError] = useState<string | null>(null);
+  const [loadingLinkCandidates, setLoadingLinkCandidates] = useState(false);
+  const [linkingDeviceId, setLinkingDeviceId] = useState<string | null>(null);
+  const [unlinkingDeviceId, setUnlinkingDeviceId] = useState<string | null>(null);
+  const [removingDevice, setRemovingDevice] = useState(false);
+  const [deviceOptionsOpen, setDeviceOptionsOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBrand, setEditBrand] = useState("");
+  const [editModel, setEditModel] = useState("");
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deviceQuery, setDeviceQuery] = useState("");
   const latestStockMutation = useDataSyncStore(
     (state) => state.latestStockMutation,
   );
   const publishStockMutation = useDataSyncStore(
     (state) => state.publishStockMutation,
   );
+  const publishDevice = useDataSyncStore((state) => state.publishDevice);
 
   useEffect(() => {
     let mounted = true;
@@ -73,6 +109,14 @@ export default function DeviceDetailRoute() {
     0;
   const availableRecords =
     detail?.covers.filter((cover) => cover.quantityOnHand > 0).length || 0;
+  const availableLinkCandidates = useMemo(() => {
+    const linkedIds = new Set(
+      [detail?.device, ...(detail?.compatibleDevices || [])]
+        .filter(Boolean)
+        .map((device) => device!.id),
+    );
+    return linkCandidates.filter((device) => !linkedIds.has(device.id));
+  }, [detail?.compatibleDevices, detail?.device, linkCandidates]);
   const header = (
     <AppHeader
       eyebrow={eyebrow}
@@ -114,6 +158,193 @@ export default function DeviceDetailRoute() {
       throw new Error(message);
     }
   };
+  const openLinkPicker = () => {
+    setDeviceQuery("");
+    setLinkCandidates([]);
+    setLinkCandidatesError(null);
+    setLoadingLinkCandidates(false);
+    setLinkPickerOpen(true);
+  };
+  const openEdit = () => {
+    if (!detail) return;
+    setEditBrand(detail.device.brand);
+    setEditModel(detail.device.model);
+    setEditImageUrl(detail.device.images?.primary || "");
+    setEditOpen(true);
+  };
+  const chooseDeviceOption = (action: () => void) => {
+    setDeviceOptionsOpen(false);
+    setTimeout(action, 200);
+  };
+  const saveEdit = async () => {
+    if (!detail) return;
+    setSavingEdit(true);
+    try {
+      const updated = await api.updateDevice(id, {
+        brand: editBrand.trim(),
+        model: editModel.trim(),
+        imageUrl: editImageUrl.trim(),
+      });
+      publishDevice(updated);
+      setDetail((current) =>
+        current ? { ...current, device: updated } : current,
+      );
+      setEditOpen(false);
+    } catch (reason) {
+      Alert.alert(
+        "Couldn’t update device",
+        reason instanceof Error
+          ? reason.message
+          : "Check the details and try again.",
+      );
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+  useEffect(() => {
+    const query = deviceQuery.trim();
+    if (!linkPickerOpen || !query) {
+      return undefined;
+    }
+    let active = true;
+    const timeout = setTimeout(() => {
+      setLoadingLinkCandidates(true);
+      setLinkCandidatesError(null);
+      api
+        .search(query)
+        .then((results) => {
+          if (active) setLinkCandidates(results.devices);
+        })
+        .catch((reason: unknown) => {
+          if (active)
+            setLinkCandidatesError(
+              reason instanceof Error
+                ? reason.message
+                : "Unable to search the phone catalogue.",
+            );
+        })
+        .finally(() => {
+          if (active) setLoadingLinkCandidates(false);
+        });
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [deviceQuery, linkPickerOpen]);
+  const linkDevice = async (compatibleDevice: Device) => {
+    if (!detail) return;
+    setLinkingDeviceId(compatibleDevice.id);
+    try {
+      const result = await api.linkCompatibleDevice(id, compatibleDevice.id);
+      if (!result.linked) {
+        Alert.alert("Already linked", "These phones already share compatible-cover availability.");
+        return;
+      }
+      setDetail((current) =>
+        current
+          ? {
+              ...current,
+              compatibleDevices: result.compatibleDevices,
+            }
+          : current,
+      );
+      setLinkPickerOpen(false);
+      Alert.alert(
+        "Phones linked",
+        `${detail.device.brand} ${detail.device.model} and ${compatibleDevice.brand} ${compatibleDevice.model} now share compatible-cover availability. No stock was added or changed.`,
+      );
+    } catch (reason) {
+      Alert.alert(
+        "Couldn’t link phone",
+        reason instanceof Error
+          ? reason.message
+          : "Check the connection and try again.",
+      );
+    } finally {
+      setLinkingDeviceId(null);
+    }
+  };
+  const unlinkDevice = async (compatibleDevice: Device) => {
+    if (!detail) return;
+    setUnlinkingDeviceId(compatibleDevice.id);
+    try {
+      const result = await api.unlinkCompatibleDevice(id, compatibleDevice.id);
+      if (!result.linked) {
+        Alert.alert(
+          "Couldn’t unlink phone",
+          "This compatibility is not managed by this phone link.",
+        );
+        return;
+      }
+      setDetail((current) =>
+        current
+          ? { ...current, compatibleDevices: result.compatibleDevices }
+          : current,
+      );
+      Alert.alert(
+        "Phone unlinked",
+        `${compatibleDevice.brand} ${compatibleDevice.model} no longer shares compatible-cover availability with this phone. Stock was not changed.`,
+      );
+    } catch (reason) {
+      Alert.alert(
+        "Couldn’t unlink phone",
+        reason instanceof Error
+          ? reason.message
+          : "Check the connection and try again.",
+      );
+    } finally {
+      setUnlinkingDeviceId(null);
+    }
+  };
+  const confirmLink = (compatibleDevice: Device) => {
+    if (!detail) return;
+    Alert.alert(
+      "Link these phones?",
+      `${detail.device.brand} ${detail.device.model} and ${compatibleDevice.brand} ${compatibleDevice.model} will share compatible-cover availability. No stock is required.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Link phones", onPress: () => void linkDevice(compatibleDevice) },
+      ],
+    );
+  };
+  const confirmUnlink = (compatibleDevice: Device) => {
+    Alert.alert(
+      "Unlink this phone?",
+      `${compatibleDevice.brand} ${compatibleDevice.model} will stop sharing cover availability with this phone. Stock quantities will not change.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Unlink phone", style: "destructive", onPress: () => void unlinkDevice(compatibleDevice) },
+      ],
+    );
+  };
+  const removeDevice = async () => {
+    if (!detail) return;
+    setRemovingDevice(true);
+    try {
+      await api.removeDevice(id);
+      router.back();
+    } catch (reason) {
+      Alert.alert(
+        "Couldn’t remove device",
+        reason instanceof Error
+          ? reason.message
+          : "Check the connection and try again.",
+      );
+      setRemovingDevice(false);
+    }
+  };
+  const confirmRemoveDevice = () => {
+    if (!detail) return;
+    Alert.alert(
+      "Remove this device?",
+      `${detail.device.brand} ${detail.device.model} will be removed from the active catalogue and search. Stock history is kept.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Remove device", style: "destructive", onPress: () => void removeDevice() },
+      ],
+    );
+  };
 
   if (error)
     return (
@@ -143,47 +374,38 @@ export default function DeviceDetailRoute() {
           </Text>
         </View>
       </View>
-      <StockActions quantityOnHand={unitsOnHand} onUpdate={updateStock} />
+      <View style={styles.primaryActions}>
+        <View style={styles.primaryAction}>
+          <StockActions compact quantityOnHand={unitsOnHand} onUpdate={updateStock} />
+        </View>
+        <View style={styles.primaryAction}>
+          <Button
+            label="Device options"
+            onPress={() => setDeviceOptionsOpen(true)}
+            variant="ghost"
+          />
+        </View>
+      </View>
       {detail.compatibleDevices.length ? (
         <View style={styles.compatibility}>
           <Text style={styles.compatibilityTitle}>SAME COVER FITS</Text>
           <Text style={styles.compatibilityCaption}>
             These phones use the same cover as this model.
           </Text>
-          <View style={styles.compatibilityGrid}>
-            {detail.compatibleDevices.map((device, index) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`View ${device.brand} ${device.model}`}
-                key={`${device.id}-${index}`}
+          <View style={styles.compatibleCards}>
+            {detail.compatibleDevices.map((device) => (
+              <DeviceCard
+                device={device}
+                key={device.id}
                 onPress={() =>
                   router.push({
                     pathname: "/device/[id]",
                     params: { id: device.id },
                   })
                 }
-                style={({ pressed }) => [
-                  styles.compatibilityCard,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <DeviceImage device={device} size={42} />
-                <View style={styles.compatibilityCopy}>
-                  <Text numberOfLines={1} style={styles.compatibilityBrand}>
-                    {device.brand}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.compatibilityName}>
-                    {device.model}
-                  </Text>
-                  <Text style={styles.compatibilityHint}>View availability</Text>
-                </View>
-                <View style={styles.compatibilityCount}>
-                  <Text style={styles.compatibilityNumber}>{unitsOnHand}</Text>
-                  <Text style={styles.compatibilityUnits}>
-                    {unitsOnHand === 1 ? "unit" : "units"}
-                  </Text>
-                </View>
-              </Pressable>
+                showAvailability={false}
+                showBrand
+              />
             ))}
           </View>
         </View>
@@ -196,11 +418,230 @@ export default function DeviceDetailRoute() {
           </Text>
         </View>
       ) : null}
+      <BottomSheetModal
+        closeAccessibilityLabel="Close phone picker"
+        contentStyle={styles.linkSheet}
+        height="80%"
+        onClose={() => setLinkPickerOpen(false)}
+        visible={linkPickerOpen}
+      >
+              <View style={styles.sheetHeader}>
+                <View style={styles.sheetCopy}>
+                  <Text style={styles.sheetTitle}>Link compatible phone</Text>
+                  <Text style={styles.sheetCaption}>
+                    Search the catalogue and select any phone that uses the same cover.
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityLabel="Close phone picker"
+                  accessibilityRole="button"
+                  hitSlop={12}
+                  onPress={() => setLinkPickerOpen(false)}
+                  style={styles.closeButton}
+                >
+                  <Text style={styles.closeLabel}>×</Text>
+                </Pressable>
+              </View>
+              <SearchBar
+                loading={loadingLinkCandidates}
+                onChangeText={setDeviceQuery}
+                placeholder="Search phone model"
+                value={deviceQuery}
+              />
+              <ScrollView
+                contentContainerStyle={styles.sheetContent}
+                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                style={styles.sheetScroll}
+              >
+                {detail.compatibleDevices.length ? (
+                  <View style={styles.linkedSection}>
+                    <Text style={styles.linkedTitle}>ALREADY LINKED</Text>
+                    <View style={styles.candidateList}>
+                      {detail.compatibleDevices.map((device) => (
+                        <Pressable
+                          accessibilityLabel={`Unlink ${device.brand} ${device.model}`}
+                          accessibilityRole="button"
+                          disabled={
+                            linkingDeviceId !== null || unlinkingDeviceId !== null
+                          }
+                          key={device.id}
+                          onPress={() => confirmUnlink(device)}
+                          style={({ pressed }) => [
+                            styles.candidate,
+                            (pressed ||
+                              linkingDeviceId !== null ||
+                              unlinkingDeviceId !== null) &&
+                              styles.pressed,
+                          ]}
+                        >
+                          <View style={styles.candidateCopy}>
+                            <Text numberOfLines={1} style={styles.candidateName}>
+                              {device.model}
+                            </Text>
+                            <Text numberOfLines={1} style={styles.candidateMeta}>
+                              {device.brand}
+                            </Text>
+                          </View>
+                          <Text style={styles.unlinkAction}>
+                            {unlinkingDeviceId === device.id
+                              ? "Unlinking…"
+                              : "Unlink"}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+                {linkCandidatesError ? (
+                  <Text style={styles.linkError}>{linkCandidatesError}</Text>
+                ) : null}
+                {!loadingLinkCandidates && !linkCandidatesError ? (
+                  !deviceQuery.trim() ? (
+                    <Text style={styles.emptyCandidates}>
+                      Search for a phone model to link.
+                    </Text>
+                  ) : availableLinkCandidates.length ? (
+                    <View style={styles.candidateList}>
+                      {availableLinkCandidates.map((device) => (
+                        <Pressable
+                          accessibilityLabel={`Link ${device.brand} ${device.model}`}
+                          accessibilityRole="button"
+                          disabled={
+                            linkingDeviceId !== null || unlinkingDeviceId !== null
+                          }
+                          key={device.id}
+                          onPress={() => confirmLink(device)}
+                          style={({ pressed }) => [
+                            styles.candidate,
+                            (pressed ||
+                              linkingDeviceId !== null ||
+                              unlinkingDeviceId !== null) &&
+                              styles.pressed,
+                          ]}
+                        >
+                          <View style={styles.candidateCopy}>
+                            <Text numberOfLines={1} style={styles.candidateName}>
+                              {device.model}
+                            </Text>
+                            <Text numberOfLines={1} style={styles.candidateMeta}>
+                              {device.brand}
+                            </Text>
+                          </View>
+                          <Text style={styles.linkAction}>
+                            {linkingDeviceId === device.id ? "Linking…" : "Link"}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.emptyCandidates}>
+                      No unlinked phones match that search.
+                    </Text>
+                  )
+                ) : null}
+              </ScrollView>
+      </BottomSheetModal>
+      <BottomSheetModal
+        contentStyle={styles.optionsSheet}
+        onClose={() => setDeviceOptionsOpen(false)}
+        visible={deviceOptionsOpen}
+      >
+        <Text style={styles.sheetTitle}>Device options</Text>
+        <Text style={styles.sheetCaption}>
+          Update this phone’s details or manage which models share its cover.
+        </Text>
+        <Button
+          label="Edit device"
+          onPress={() => chooseDeviceOption(openEdit)}
+          variant="secondary"
+        />
+        <Button
+          label="Manage compatible phones"
+          onPress={() => chooseDeviceOption(openLinkPicker)}
+          variant="ghost"
+        />
+        <View style={styles.dangerSection}>
+          <Text style={styles.dangerCaption}>
+            Removing a device hides it from the catalogue. Stock history is kept.
+          </Text>
+          <Button
+            disabled={removingDevice}
+            label="Remove device"
+            loading={removingDevice}
+            onPress={() => chooseDeviceOption(confirmRemoveDevice)}
+            variant="danger"
+          />
+        </View>
+      </BottomSheetModal>
+      <BottomSheetModal
+        contentStyle={styles.editSheet}
+        onClose={() => !savingEdit && setEditOpen(false)}
+        scrollable
+        visible={editOpen}
+      >
+        <Text style={styles.sheetTitle}>Edit device</Text>
+        <Text style={styles.sheetCaption}>
+          Update the name or image shown throughout the catalogue.
+        </Text>
+        <View style={styles.editField}>
+          <Text style={styles.editLabel}>Brand</Text>
+          <TextInput
+            accessibilityLabel="Device brand"
+            autoCapitalize="words"
+            autoCorrect={false}
+            editable={!savingEdit}
+            onChangeText={setEditBrand}
+            style={styles.editInput}
+            value={editBrand}
+          />
+        </View>
+        <View style={styles.editField}>
+          <Text style={styles.editLabel}>Model</Text>
+          <TextInput
+            accessibilityLabel="Device model"
+            autoCapitalize="words"
+            autoCorrect={false}
+            editable={!savingEdit}
+            onChangeText={setEditModel}
+            style={styles.editInput}
+            value={editModel}
+          />
+        </View>
+        <View style={styles.editField}>
+          <Text style={styles.editLabel}>Image URL (optional)</Text>
+          <TextInput
+            accessibilityLabel="Device image URL"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!savingEdit}
+            keyboardType="url"
+            onChangeText={setEditImageUrl}
+            placeholder="https://example.com/phone.jpg"
+            placeholderTextColor={colors.muted}
+            style={styles.editInput}
+            value={editImageUrl}
+          />
+        </View>
+        <Button
+          disabled={!editBrand.trim() || !editModel.trim()}
+          label="Save changes"
+          loading={savingEdit}
+          onPress={saveEdit}
+        />
+        <Button
+          disabled={savingEdit}
+          label="Cancel"
+          onPress={() => setEditOpen(false)}
+          variant="ghost"
+        />
+      </BottomSheetModal>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   summary: {
     alignItems: "center",
     backgroundColor: colors.primarySoft,
@@ -220,46 +661,17 @@ const styles = StyleSheet.create({
   },
   count: { color: colors.ink, fontSize: 25, fontWeight: "900" },
   caption: { color: colors.muted, fontSize: 14 },
+  primaryActions: {
+    alignItems: "stretch",
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  primaryAction: { flex: 1 },
   compatibility: { gap: spacing.xs },
   compatibilityTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
   compatibilityCaption: { color: colors.muted, fontSize: 14 },
-  compatibilityGrid: { gap: 1, backgroundColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
-  compatibilityCard: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 0,
-    flexDirection: "row",
-    gap: spacing.sm,
-    padding: spacing.sm,
-  },
-  compatibilityCopy: { flex: 1, gap: 2 },
-  compatibilityBrand: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.7,
-  },
-  compatibilityName: { color: colors.ink, fontSize: 15, fontWeight: "800" },
-  compatibilityHint: { color: colors.primary, fontSize: 13, fontWeight: "700" },
-  compatibilityCount: {
-    alignItems: "center",
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.md,
-    minWidth: 46,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  compatibilityNumber: {
-    color: colors.primary,
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  compatibilityUnits: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
+  compatibleCards: { gap: spacing.xs },
+  compatibilityNames: { color: colors.ink, fontSize: 15, fontWeight: "700", lineHeight: 22 },
   pressed: { opacity: 0.7 },
   emptyGuide: {
     backgroundColor: colors.surfaceMuted,
@@ -269,4 +681,91 @@ const styles = StyleSheet.create({
   },
   emptyGuideTitle: { color: colors.ink, fontSize: 15, fontWeight: "900" },
   emptyGuideCopy: { color: colors.muted, fontSize: 14, lineHeight: 20 },
+  linkSheet: {
+    backgroundColor: colors.canvas,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  editSheet: {
+    backgroundColor: colors.canvas,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    gap: spacing.md,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxl,
+  },
+  optionsSheet: {
+    backgroundColor: colors.canvas,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    gap: spacing.md,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxl,
+  },
+  dangerSection: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    paddingTop: spacing.md,
+  },
+  dangerCaption: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  editField: { gap: spacing.xs },
+  editLabel: { color: colors.ink, fontSize: 14, fontWeight: "800" },
+  editInput: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    color: colors.ink,
+    fontSize: 16,
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
+  },
+  sheetScroll: { flex: 1 },
+  sheetContent: { gap: spacing.md, paddingBottom: spacing.sm },
+  sheetHeader: { alignItems: "flex-start", flexDirection: "row", gap: spacing.sm },
+  sheetCopy: { flex: 1, gap: 3 },
+  sheetTitle: { color: colors.ink, fontSize: 20, fontWeight: "900" },
+  sheetCaption: { color: colors.muted, fontSize: 14, lineHeight: 20 },
+  closeButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.pill,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  closeLabel: { color: colors.ink, fontSize: 25, fontWeight: "500", lineHeight: 28 },
+  linkError: { color: colors.danger, fontSize: 14, fontWeight: "700" },
+  linkedSection: { gap: spacing.xs },
+  linkedTitle: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  candidateList: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  candidate: {
+    alignItems: "center",
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  candidateCopy: { flex: 1, gap: 3 },
+  candidateName: { color: colors.ink, fontSize: 15, fontWeight: "800" },
+  candidateMeta: { color: colors.muted, fontSize: 13 },
+  linkAction: { color: colors.primary, fontSize: 14, fontWeight: "900" },
+  unlinkAction: { color: colors.danger, fontSize: 14, fontWeight: "900" },
+  emptyCandidates: { color: colors.muted, fontSize: 14, lineHeight: 20, paddingVertical: spacing.sm },
 });

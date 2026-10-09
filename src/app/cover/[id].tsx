@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -12,17 +11,22 @@ import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";
 import { Button } from "../../components/common/Button";
-import { DeviceImage } from "../../components/common/DeviceImage";
+import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { FilterChips } from "../../components/common/FilterChips";
 import { Screen } from "../../components/common/Screen";
 import { StockActions } from "../../components/common/StockActions";
 import { QuantityStepper } from "../../components/common/QuantityStepper";
-import { KeyboardAwareBottomSheet } from "../../components/common/KeyboardAwareBottomSheet";
+import { BottomSheetModal } from "../../components/common/BottomSheetModal";
 import { StockBadge } from "../../components/common/StockBadge";
 import { commonStyles } from "../../design-system/styles";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import { formatDate, titleCase } from "../../lib/format";
 import { api } from "../../lib/api";
 import { useDataSyncStore } from "../../lib/dataSync";
@@ -31,6 +35,8 @@ import type { Cover, InventoryTransaction } from "../../types/domain";
 type HistoryFilter = "all" | "sale" | "restock" | "adjustment";
 
 export default function CoverDetailRoute() {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loadedCover, setCover] = useState<Cover | null>(null);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
@@ -74,6 +80,9 @@ export default function CoverDetailRoute() {
     latestStockMutation?.cover.id === id
       ? latestStockMutation.cover
       : loadedCover;
+  const compatiblePhoneNames = cover?.compatibleDevices?.length
+    ? cover.compatibleDevices.map((device) => `${device.brand} ${device.model}`)
+    : cover?.compatibleModels || [];
   const visibleTransactions = useMemo(
     () =>
       latestStockMutation?.cover.id === id
@@ -177,18 +186,16 @@ export default function CoverDetailRoute() {
       </View>
       <StockActions quantityOnHand={cover.quantityOnHand} onUpdate={update} />
       <Button
-        compact
         label="Correct count"
         onPress={openAdjustment}
         variant="ghost"
       />
       <Text style={commonStyles.sectionTitle}>Compatible phones</Text>
-      <View style={styles.detailCard}>
-        {cover.compatibleDevices?.length ? (
-          cover.compatibleDevices.map((device) => (
-            <Pressable
-              accessibilityLabel={`Open ${device.brand} ${device.model} details`}
-              accessibilityRole="button"
+      {cover.compatibleDevices?.length ? (
+        <View style={styles.compatibleCards}>
+          {cover.compatibleDevices.map((device) => (
+            <DeviceCard
+              device={device}
               key={device.id}
               onPress={() =>
                 router.push({
@@ -196,29 +203,24 @@ export default function CoverDetailRoute() {
                   params: { id: device.id },
                 })
               }
-              style={({ pressed }) => [
-                styles.deviceRow,
-                pressed && styles.pressed,
-              ]}
-            >
-              <DeviceImage device={device} size={42} />
-              <View style={styles.deviceCopy}>
-                <Text style={styles.brand}>{device.brand}</Text>
-                <Text style={styles.model}>{device.model}</Text>
-              </View>
-              <Text style={styles.linkHint}>View details</Text>
-            </Pressable>
-          ))
-        ) : cover.compatibleModels.length ? (
-          cover.compatibleModels.map((model, index) => (
+              showAvailability={false}
+              showBrand
+            />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.detailCard}>
+          {compatiblePhoneNames.length ? (
+          compatiblePhoneNames.map((model, index) => (
             <Text key={`${model}-${index}`} style={styles.model}>
               {model}
             </Text>
-          ))
-        ) : (
-          <Text style={commonStyles.caption}>No compatible phones linked.</Text>
-        )}
-      </View>
+            ))
+          ) : (
+            <Text style={commonStyles.caption}>No compatible phones linked.</Text>
+          )}
+        </View>
+      )}
       <Text style={commonStyles.sectionTitle}>Stock history</Text>
       {visibleTransactions.length ? (
         <>
@@ -291,15 +293,12 @@ export default function CoverDetailRoute() {
           message="Changes to this cover will appear here."
         />
       )}
-      <Modal
-        animationType="slide"
-        onRequestClose={() => setAdjustmentOpen(false)}
-        transparent
+      <BottomSheetModal
+        contentStyle={styles.sheet}
+        onClose={() => setAdjustmentOpen(false)}
+        scrollable
         visible={adjustmentOpen}
       >
-        <View style={styles.modalBackdrop}>
-          <KeyboardAwareBottomSheet>
-            <View style={styles.sheet}>
               <View style={styles.handle} />
               <Text style={styles.label}>COUNT CORRECTION</Text>
               <Text style={styles.sheetTitle}>Correct available stock</Text>
@@ -337,21 +336,17 @@ export default function CoverDetailRoute() {
                 onPress={saveAdjustment}
               />
               <Button
-                compact
                 disabled={adjusting}
                 label="Cancel"
                 onPress={() => setAdjustmentOpen(false)}
                 variant="ghost"
               />
-            </View>
-          </KeyboardAwareBottomSheet>
-        </View>
-      </Modal>
+      </BottomSheetModal>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   stockCard: {
     ...commonStyles.card,
     alignItems: "center",
@@ -366,22 +361,7 @@ const styles = StyleSheet.create({
   },
   count: { color: colors.ink, fontSize: 27, fontWeight: "900", marginTop: 3 },
   detailCard: { ...commonStyles.card, gap: spacing.sm },
-  deviceRow: {
-    alignItems: "center",
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.sm,
-    flexDirection: "row",
-    gap: spacing.sm,
-    padding: spacing.xs,
-  },
-  deviceCopy: { flex: 1, gap: 2 },
-  linkHint: { color: colors.primary, fontSize: 12, fontWeight: "800" },
-  brand: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.7,
-  },
+  compatibleCards: { gap: spacing.xs },
   model: {
     color: colors.primary,
     flex: 1,
@@ -408,11 +388,6 @@ const styles = StyleSheet.create({
   delta: { color: colors.success, fontSize: 18, fontWeight: "900" },
   deltaOut: { color: colors.danger },
   pressed: { opacity: 0.72 },
-  modalBackdrop: {
-    backgroundColor: "rgba(21, 35, 31, .35)",
-    flex: 1,
-    justifyContent: "flex-end",
-  },
   sheet: {
     backgroundColor: colors.canvas,
     borderTopLeftRadius: radius.lg,

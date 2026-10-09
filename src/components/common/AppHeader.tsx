@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { commonStyles } from "../../design-system/styles";
-import { colors, spacing } from "../../design-system/tokens";
+import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
+import { spacing } from "../../design-system/tokens";
 
 interface AppHeaderProps {
   eyebrow: string;
@@ -17,6 +18,8 @@ export function AppHeader({
   left,
   right,
 }: AppHeaderProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.wrap}>
       {left ? <View style={styles.left}>{left}</View> : null}
@@ -33,7 +36,7 @@ export function AppHeader({
     </View>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: {
     alignItems: "flex-start",
     flexDirection: "row",

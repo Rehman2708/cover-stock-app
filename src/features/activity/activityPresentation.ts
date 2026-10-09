@@ -1,7 +1,8 @@
 import type { ComponentProps } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { InventoryTransaction, TransactionType } from "../../types/domain";
-import { colors } from "../../design-system/tokens";
+import { type ThemeColors } from "../../design-system/ThemeProvider";
+import { colors as defaultColors } from "../../design-system/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -12,7 +13,10 @@ export interface ActivityMeta {
   softColor: string;
 }
 
-export function activityMeta(type: TransactionType): ActivityMeta {
+export function activityMeta(
+  type: TransactionType,
+  colors: ThemeColors = defaultColors,
+): ActivityMeta {
   const values: Record<TransactionType, ActivityMeta> = {
     sale: {
       label: "Sale",
@@ -50,6 +54,12 @@ export function activityMeta(type: TransactionType): ActivityMeta {
       color: colors.primary,
       softColor: colors.primarySoft,
     },
+    compatibility_link: {
+      label: "Phone linked",
+      icon: "link-outline",
+      color: colors.primary,
+      softColor: colors.primarySoft,
+    },
   };
   return values[type];
 }
@@ -62,6 +72,7 @@ export function activityNote(item: InventoryTransaction) {
   if (item.type === "return") return "Customer return";
   if (item.type === "damaged") return "Damaged stock removed";
   if (item.type === "opening_balance") return "Starting quantity";
+  if (item.type === "compatibility_link") return "Compatible phone linked";
   return "Stock count correction";
 }
 
@@ -94,6 +105,7 @@ export function activityTime(value: string) {
 }
 
 export function stockTransition(item: InventoryTransaction) {
+  if (item.type === "compatibility_link") return "Fitment linked";
   if (
     Number.isInteger(item.quantityBefore) &&
     Number.isInteger(item.quantityAfter)

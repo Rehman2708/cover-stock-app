@@ -2,23 +2,26 @@ import { View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { colors } from "../design-system/tokens";
+import { ThemeProvider, useTheme } from "../design-system/ThemeProvider";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
 import { SkeletonList } from "../components/common/Skeleton";
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <AuthProvider>
-        <RootNavigator />
-      </AuthProvider>
+      <ThemeProvider>
+        <StatusBar style="dark" />
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 function RootNavigator() {
   const { user, loading } = useAuth();
+  const { colors } = useTheme();
   if (loading)
     return (
       <View

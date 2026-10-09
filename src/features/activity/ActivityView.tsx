@@ -10,7 +10,12 @@ import { SkeletonList } from "../../components/common/Skeleton";
 import { FilterChips } from "../../components/common/FilterChips";
 import { SearchBar } from "../../components/common/SearchBar";
 import { Screen, createRefreshControl } from "../../components/common/Screen";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import {
   activityDayLabel,
   activityMeta,
@@ -51,6 +56,8 @@ export function ActivityView({
   refresh,
   loadMore,
 }: ActivityViewProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const filteredItems = useMemo(
     () => items.filter((item) => matchesFilter(item, filter)),
@@ -137,7 +144,7 @@ export function ActivityView({
   return (
     <Screen
       header={header}
-      refreshControl={createRefreshControl(loading, refresh)}
+      refreshControl={createRefreshControl(loading, refresh, colors)}
     >
       {error ? (
         <View style={styles.error}>
@@ -226,6 +233,7 @@ export function ActivityView({
 }
 
 function Summary({ value, label }: { value: number; label: string }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.summaryItem}>
       <Text style={styles.summaryValue}>{value}</Text>
@@ -240,10 +248,12 @@ function ActivityRow({
   item: InventoryTransaction;
   last: boolean;
 }) {
-  const meta = activityMeta(item.type);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const meta = activityMeta(item.type, colors);
   return (
     <Pressable
-      accessibilityLabel={`Open ${meta.label.toLowerCase()} for ${item.coverName || "cover"}`}
+      accessibilityLabel={`Open ${meta.label.toLowerCase()} for ${item.compatibleModels?.join(", ") || "phone stock"}`}
       accessibilityRole="button"
       onPress={() =>
         router.push({ pathname: "/activity/[id]", params: { id: item.id } })
@@ -259,12 +269,12 @@ function ActivityRow({
       </View>
       <View style={styles.rowCopy}>
         <Text numberOfLines={1} style={styles.coverName}>
-          {item.coverName || "Cover no longer available"}
+          {item.compatibleModels?.join(" · ") || "Phone stock record"}
         </Text>
         <Text numberOfLines={1} style={styles.models}>
-          {item.compatibleModels?.slice(0, 2).join(" · ") ||
-            item.coverSku ||
-            "Cover details unavailable"}
+          {item.compatibleModels?.length
+            ? "Phone-based stock"
+            : "Phone details unavailable"}
         </Text>
         <View style={styles.metaLine}>
           <Text
@@ -285,8 +295,9 @@ function ActivityRow({
       </View>
       <View style={styles.movement}>
         <Text style={[styles.delta, { color: meta.color }]}>
-          {item.quantityDelta > 0 ? "+" : ""}
-          {item.quantityDelta}
+          {item.type === "compatibility_link"
+            ? "Linked"
+            : `${item.quantityDelta > 0 ? "+" : ""}${item.quantityDelta}`}
         </Text>
         <Text style={styles.transition}>{stockTransition(item)}</Text>
         <Ionicons color={colors.muted} name="chevron-forward" size={18} />
@@ -295,7 +306,7 @@ function ActivityRow({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   error: {
     padding: spacing.md,
     backgroundColor: colors.dangerSoft,

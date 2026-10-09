@@ -1,78 +1,168 @@
+import type { ReactNode } from "react";
 import type { GestureResponderEvent } from "react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { commonStyles } from "../../design-system/styles";
-import { colors, radius, spacing } from "../../design-system/tokens";
-import type { Device } from "../../types/domain";
-import { DeviceImage } from "./DeviceImage";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { commonStyles } from "../../design-system/styles";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
+import type { Cover, Device } from "../../types/domain";
+import { DeviceImage } from "./DeviceImage";
+import { StockBadge } from "./StockBadge";
+
+type CardDevice = Pick<Device, "brand" | "model" | "images"> &
+  Partial<Pick<Device, "inventory" | "compatibleDevices">>;
 
 interface DeviceCardProps {
-  device: Device;
-  onPress: (event: GestureResponderEvent) => void;
+  device?: CardDevice;
+  cover?: Cover;
+  onPress?: (event: GestureResponderEvent) => void;
   showBrand?: boolean;
+  showFitCount?: boolean;
+  fitCount?: number;
+  showAvailability?: boolean;
+  quantity?: number;
+  quantityLabel?: string;
+  meta?: ReactNode;
+  children?: ReactNode;
   unavailableCaption?: string;
 }
 
 export function DeviceCard({
   device,
+  cover,
   onPress,
-  showBrand = true,
+  showBrand,
+  showFitCount = false,
+  fitCount,
+  showAvailability,
+  quantity,
+  quantityLabel = "covers",
+  meta,
+  children,
   unavailableCaption = "View compatible covers",
 }: DeviceCardProps) {
-  const unitsOnHand = device.inventory?.unitsOnHand;
-  const hasKnownAvailability = unitsOnHand !== undefined;
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const displayedDevice =
+    device ||
+    cover?.displayDevice || {
+      brand: "",
+      model: cover?.compatibleModels?.join(" · ") || "Unlinked phone",
+      images: undefined,
+    };
+  const compatibleCount =
+    cover?.compatibleDevices?.length || cover?.compatibleModels?.length || 0;
+  const displayedQuantity =
+    quantity ?? cover?.quantityOnHand ?? device?.inventory?.unitsOnHand;
+  const hasKnownAvailability = displayedQuantity !== undefined;
+  const showDeviceBrand =
+    showBrand ?? (cover ? Boolean(cover.displayDevice) : true);
+  const showDeviceAvailability = showAvailability ?? !cover;
+  const displayedFitCount =
+    fitCount ??
+    (cover
+      ? compatibleCount
+      : 1 + (device?.compatibleDevices?.length || 0));
+  const shouldShowFitCount = showFitCount || Boolean(cover);
   const availability = !hasKnownAvailability
     ? unavailableCaption
-    : unitsOnHand > 0
-      ? `${unitsOnHand} ${unitsOnHand === 1 ? "cover" : "covers"} available`
+    : displayedQuantity > 0
+      ? `${displayedQuantity} ${displayedQuantity === 1 ? "cover" : "covers"} available`
       : "Out of stock";
-  return (
-    <Pressable
-      accessibilityLabel={`View ${device.brand} ${device.model} cover availability`}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-    >
-      <DeviceImage device={device} />
-      <View style={styles.copy}>
-        {showBrand ? <Text style={styles.brand}>{device.brand}</Text> : null}
-        <Text style={styles.model}>{device.model}</Text>
-        <Text style={styles.availability}>{availability}</Text>
-      </View>
-      {hasKnownAvailability ? (
-        <View style={[styles.count, unitsOnHand === 0 && styles.emptyCount]}>
-          <Text
-            style={[
-              styles.countValue,
-              unitsOnHand === 0 && styles.emptyCountValue,
-            ]}
-          >
-            {unitsOnHand}
+  const cardMeta =
+    meta ||
+    (cover ? (
+      <>
+        <StockBadge cover={cover} />
+        {compatibleCount ? (
+          <Text style={styles.compatibility}>
+            Fits {compatibleCount} {compatibleCount === 1 ? "phone" : "phones"}
           </Text>
-          <Text
-            style={[
-              styles.countLabel,
-              unitsOnHand === 0 && styles.emptyCountValue,
-            ]}
-          >
-            covers
-          </Text>
+        ) : null}
+      </>
+    ) : null);
+  const content = (
+    <>
+      <View style={styles.top}>
+        <DeviceImage device={displayedDevice} />
+        <View style={styles.copy}>
+          {showDeviceBrand ? (
+            <Text style={styles.brand}>{displayedDevice.brand}</Text>
+          ) : null}
+          <Text style={styles.model}>{displayedDevice.model}</Text>
+          {showDeviceAvailability ? (
+            <Text style={styles.availability}>{availability}</Text>
+          ) : null}
+          {shouldShowFitCount && !cover ? (
+            <Text style={styles.compatibility}>
+              Fits {displayedFitCount}{" "}
+              {displayedFitCount === 1 ? "phone" : "phones"}
+            </Text>
+          ) : null}
         </View>
-      ) : null}
-      <Ionicons color={colors.muted} name="chevron-forward" size={20} />
-    </Pressable>
+        {hasKnownAvailability ? (
+          <View
+            style={[
+              styles.count,
+              displayedQuantity === 0 && styles.emptyCount,
+            ]}
+          >
+            <Text
+              style={[
+                styles.countValue,
+                displayedQuantity === 0 && styles.emptyCountValue,
+              ]}
+            >
+              {displayedQuantity}
+            </Text>
+            <Text
+              style={[
+                styles.countLabel,
+                displayedQuantity === 0 && styles.emptyCountValue,
+              ]}
+            >
+              {quantityLabel}
+            </Text>
+          </View>
+        ) : null}
+        <Ionicons color={colors.muted} name="chevron-forward" size={20} />
+      </View>
+      {cardMeta ? <View style={styles.meta}>{cardMeta}</View> : null}
+    </>
+  );
+
+  return (
+    <View style={styles.card}>
+      {onPress ? (
+        <Pressable
+          accessibilityLabel={`View ${displayedDevice.brand} ${displayedDevice.model} cover availability`}
+          accessibilityRole="button"
+          onPress={onPress}
+          style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
+        >
+          {content}
+        </Pressable>
+      ) : (
+        <View style={styles.pressable}>{content}</View>
+      )}
+      {children}
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
     ...commonStyles.card,
-    alignItems: "center",
-    flexDirection: "row",
     gap: spacing.sm,
     minHeight: 76,
     paddingVertical: spacing.sm,
   },
+  pressable: { gap: spacing.sm },
+  top: { alignItems: "center", flexDirection: "row", gap: spacing.sm },
   pressed: { opacity: 0.72 },
   copy: { flex: 1, gap: 2 },
   brand: {
@@ -83,6 +173,13 @@ const styles = StyleSheet.create({
   },
   model: { color: colors.ink, fontSize: 16, fontWeight: "900" },
   availability: { color: colors.muted, fontSize: 13 },
+  compatibility: { color: colors.muted, fontSize: 12, fontWeight: "700" },
+  meta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginLeft: 58 + spacing.sm,
+  },
   count: {
     alignItems: "center",
     backgroundColor: colors.primarySoft,

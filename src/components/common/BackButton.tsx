@@ -1,11 +1,18 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet } from "react-native";
-import { colors, radius } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius } from "../../design-system/tokens";
 
 interface BackButtonProps {
   onPress: () => void;
 }
 export function BackButton({ onPress }: BackButtonProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <Pressable
       accessibilityHint="Returns to the previous screen"
@@ -15,15 +22,15 @@ export function BackButton({ onPress }: BackButtonProps) {
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
-      <Ionicons color={colors.ink} name="arrow-back" size={22} />
+      <Ionicons color={colors.primary} name="arrow-back" size={22} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.primarySoft,
     borderRadius: radius.md,
     height: 40,
     justifyContent: "center",

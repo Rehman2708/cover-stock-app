@@ -1,19 +1,26 @@
 import { useEffect, useState } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import type { StockMutation, TransactionType } from "../../types/domain";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import { type ThemeColors, useThemedStyles } from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import { Button } from "./Button";
-import { KeyboardAwareBottomSheet } from "./KeyboardAwareBottomSheet";
+import { BottomSheetModal } from "./BottomSheetModal";
 import { QuantityStepper } from "./QuantityStepper";
 
 interface StockActionsProps {
   quantityOnHand: number;
+  compact?: boolean;
   onUpdate: (
     type: Extract<TransactionType, "sale" | "restock">,
     quantity: number,
   ) => Promise<StockMutation>;
 }
-export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
+export function StockActions({
+  quantityOnHand,
+  compact = false,
+  onUpdate,
+}: StockActionsProps) {
+  const styles = useThemedStyles(createStyles);
   const [action, setAction] = useState<Extract<
     TransactionType,
     "sale" | "restock"
@@ -25,6 +32,7 @@ export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
     quantity: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stockOptionsOpen, setStockOptionsOpen] = useState(false);
   useEffect(() => {
     if (!undo) return undefined;
     const timeout = setTimeout(() => setUndo(null), 8000);
@@ -35,6 +43,12 @@ export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
     setQuantity(1);
     setError(null);
     setAction(nextAction);
+  };
+  const chooseStockAction = (
+    nextAction: Extract<TransactionType, "sale" | "restock">,
+  ) => {
+    setStockOptionsOpen(false);
+    setTimeout(() => open(nextAction), 200);
   };
   const commit = async () => {
     if (!action) return;
@@ -71,31 +85,46 @@ export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
   return (
     <View style={styles.wrap}>
       <View style={styles.actions}>
-        <View style={styles.action}>
-          <Button
-            disabled={updating}
-            label={quantityOnHand === 0 ? "Add stock for this phone" : "Add stock"}
-            onPress={() => open("restock")}
-            variant={quantityOnHand === 0 ? "primary" : "secondary"}
-          />
-        </View>
-        {quantityOnHand > 0 ? (
+        {compact ? (
           <View style={styles.action}>
             <Button
-              compact
               disabled={updating}
-              label="Remove stock"
-              onPress={() => open("sale")}
-              variant="ghost"
+              label={quantityOnHand === 0 ? "Add stock" : "Stock actions"}
+              onPress={() =>
+                quantityOnHand === 0
+                  ? open("restock")
+                  : setStockOptionsOpen(true)
+              }
+              variant={quantityOnHand === 0 ? "primary" : "secondary"}
             />
           </View>
-        ) : null}
+        ) : (
+          <>
+            <View style={styles.action}>
+              <Button
+                disabled={updating}
+                label={quantityOnHand === 0 ? "Add stock for this phone" : "Add stock"}
+                onPress={() => open("restock")}
+                variant={quantityOnHand === 0 ? "primary" : "secondary"}
+              />
+            </View>
+            {quantityOnHand > 0 ? (
+              <View style={styles.action}>
+                <Button
+                  disabled={updating}
+                  label="Remove stock"
+                  onPress={() => open("sale")}
+                  variant="ghost"
+                />
+              </View>
+            ) : null}
+          </>
+        )}
       </View>
       {undo ? (
         <View accessibilityLiveRegion="polite" style={styles.undo}>
           <Text style={styles.undoText}>Stock updated.</Text>
           <Button
-            compact
             disabled={updating}
             label="Undo"
             onPress={undoLast}
@@ -103,15 +132,12 @@ export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
           />
         </View>
       ) : null}
-      <Modal
-        animationType="slide"
-        onRequestClose={() => setAction(null)}
-        transparent
+      <BottomSheetModal
+        contentStyle={styles.sheet}
+        onClose={() => setAction(null)}
+        scrollable
         visible={Boolean(action)}
       >
-        <View style={styles.backdrop}>
-          <KeyboardAwareBottomSheet>
-            <View style={styles.sheet}>
               <View style={styles.handle} />
               <Text style={styles.eyebrow}>
                 {removing ? "UPDATE AVAILABILITY" : "ADD AVAILABILITY"}
@@ -144,22 +170,39 @@ export function StockActions({ quantityOnHand, onUpdate }: StockActionsProps) {
                 onPress={commit}
               />
               <Button
-                compact
                 disabled={updating}
                 label="Cancel"
                 onPress={() => setAction(null)}
                 variant="ghost"
               />
-            </View>
-          </KeyboardAwareBottomSheet>
-        </View>
-      </Modal>
+      </BottomSheetModal>
+      <BottomSheetModal
+        contentStyle={styles.sheet}
+        onClose={() => setStockOptionsOpen(false)}
+        visible={stockOptionsOpen}
+      >
+        <Text style={styles.eyebrow}>STOCK ACTIONS</Text>
+        <Text style={styles.title}>Update availability</Text>
+        <Text style={styles.body}>
+          Add covers received or remove covers sold from this phone’s stock.
+        </Text>
+        <Button
+          label="Add stock"
+          onPress={() => chooseStockAction("restock")}
+          variant="secondary"
+        />
+        <Button
+          label="Remove stock"
+          onPress={() => chooseStockAction("sale")}
+          variant="ghost"
+        />
+      </BottomSheetModal>
     </View>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: { gap: spacing.sm },
-  actions: { flexDirection: "row", gap: spacing.sm },
+  actions: { flex: 1, flexDirection: "row", gap: spacing.sm },
   action: { flex: 1 },
   undo: {
     alignItems: "center",
@@ -170,11 +213,6 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.md,
   },
   undoText: { color: colors.success, fontWeight: "800" },
-  backdrop: {
-    backgroundColor: "rgba(21, 35, 31, .35)",
-    flex: 1,
-    justifyContent: "flex-end",
-  },
   sheet: {
     backgroundColor: colors.canvas,
     borderTopLeftRadius: radius.lg,

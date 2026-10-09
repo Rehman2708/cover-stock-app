@@ -3,12 +3,13 @@ import { StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { Button } from "../../components/common/Button";
-import { CoverCard } from "../../components/common/CoverCard";
+import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { FilterChips } from "../../components/common/FilterChips";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { StockActions } from "../../components/common/StockActions";
+import { useTheme } from "../../design-system/ThemeProvider";
 import { colors, spacing } from "../../design-system/tokens";
 import type { Cover, StockMutation, TransactionType } from "../../types/domain";
 
@@ -85,7 +86,7 @@ export function InventoryList({
           {filteredCovers.length ? (
             <>
               {filteredCovers.map((cover, index) => (
-                <CoverCard
+                <DeviceCard
                   key={`${cover.id}-${index}`}
                   cover={cover}
                   onPress={() =>
@@ -101,7 +102,7 @@ export function InventoryList({
                       updateStock(cover, type, quantity)
                     }
                   />
-                </CoverCard>
+                </DeviceCard>
               ))}
               {nextOffset !== null ? (
                 <Button
@@ -130,6 +131,7 @@ export function InventoryList({
 }
 
 export function InventoryView(props: InventoryViewProps) {
+  const { colors } = useTheme();
   const { filter: requestedFilter } = useLocalSearchParams<{
     filter?: InventoryFilter;
   }>();
@@ -147,7 +149,7 @@ export function InventoryView(props: InventoryViewProps) {
           subtitle={`${props.total} active stock records`}
         />
       }
-      refreshControl={createRefreshControl(props.loading, props.refresh)}
+      refreshControl={createRefreshControl(props.loading, props.refresh, colors)}
     >
       <InventoryList
         {...props}

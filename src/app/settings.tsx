@@ -2,9 +2,11 @@ import { StyleSheet, Text, View } from "react-native";
 import { AppHeader } from "../components/common/AppHeader";
 import { Screen } from "../components/common/Screen";
 import { commonStyles } from "../design-system/styles";
-import { colors, radius, spacing } from "../design-system/tokens";
+import { type ThemeColors, useThemedStyles } from "../design-system/ThemeProvider";
+import { radius, spacing } from "../design-system/tokens";
 
 export default function SettingsRoute() {
+  const styles = useThemedStyles(createStyles);
   return (
     <Screen
       header={
@@ -23,7 +25,7 @@ export default function SettingsRoute() {
     </Screen>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { commonStyles } from "../../design-system/styles";
+import { type ThemeColors } from "../../design-system/ThemeProvider";
 import { colors, spacing } from "../../design-system/tokens";
 
 interface ScreenProps {
@@ -53,16 +54,17 @@ export function Screen({
 export function createRefreshControl(
   refreshing: boolean,
   onRefresh: NonNullable<RefreshControlProps["onRefresh"]>,
+  themeColors: ThemeColors = colors,
 ) {
   return (
     <RefreshControl
-      colors={Platform.OS === "android" ? [colors.primary] : undefined}
+      colors={Platform.OS === "android" ? [themeColors.primary] : undefined}
       onRefresh={onRefresh}
       progressBackgroundColor={
-        Platform.OS === "android" ? colors.surface : undefined
+        Platform.OS === "android" ? themeColors.surface : undefined
       }
       refreshing={refreshing}
-      tintColor={colors.primary}
+      tintColor={themeColors.primary}
     />
   );
 }

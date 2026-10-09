@@ -1,6 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { colors, radius } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius } from "../../design-system/tokens";
 import type { Device } from "../../types/domain";
 
 interface DeviceImageProps {
@@ -13,6 +18,8 @@ export function DeviceImage({
   size = 58,
   showFallbackLabel = false,
 }: DeviceImageProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const uri = device.images?.primary || device.images?.back;
   if (uri)
     return (
@@ -42,7 +49,7 @@ export function DeviceImage({
     </View>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   image: { backgroundColor: colors.primarySoft, borderRadius: radius.md },
   fallback: {
     alignItems: "center",

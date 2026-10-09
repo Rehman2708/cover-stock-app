@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { Button } from "../../components/common/Button";
 import { BackButton } from "../../components/common/BackButton";
-import { CoverCard } from "../../components/common/CoverCard";
 import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { Screen } from "../../components/common/Screen";
@@ -104,7 +103,7 @@ export default function BrandRoute() {
             <DeviceRow device={device} key={`${device.id}-${index}`} />
           ))}
           {results.covers.map((cover, index) => (
-            <CoverCard
+            <DeviceCard
               cover={cover}
               key={`${cover.id}-${index}`}
               onPress={() =>

@@ -7,13 +7,17 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
-import { CoverCard } from "../../components/common/CoverCard";
 import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { Screen } from "../../components/common/Screen";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { commonStyles } from "../../design-system/styles";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import {
+  type ThemeColors,
+  useTheme,
+  useThemedStyles,
+} from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import type { Dispatch, SetStateAction } from "react";
 import type { SearchResults } from "../../types/domain";
 
@@ -31,6 +35,8 @@ export function SearchView({
   loading,
   error,
 }: SearchViewProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const searched = Boolean(query.trim());
   return (
     <Screen
@@ -88,7 +94,7 @@ export function SearchView({
         <>
           <Text style={commonStyles.sectionTitle}>Stock</Text>
           {results.covers.map((cover, index) => (
-            <CoverCard
+            <DeviceCard
               key={`${cover.id}-${index}`}
               cover={cover}
               onPress={() =>
@@ -120,7 +126,7 @@ export function SearchView({
     </Screen>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   search: {
     flexDirection: "row",
     alignItems: "center",

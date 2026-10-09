@@ -1,12 +1,14 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppHeader } from "../../components/common/AppHeader";
 import { Button } from "../../components/common/Button";
-import { CoverCard } from "../../components/common/CoverCard";
+import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { SkeletonList } from "../../components/common/Skeleton";
 import { Screen, createRefreshControl } from "../../components/common/Screen";
 import { commonStyles } from "../../design-system/styles";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { formatDate, titleCase } from "../../lib/format";
 import type { DashboardData } from "../../types/domain";
@@ -25,6 +27,8 @@ function Metric({
   tone?: MetricTone;
   filter?: InventoryFilter;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const tones = {
     neutral: undefined,
     warning: styles.warning,
@@ -63,6 +67,8 @@ export function DashboardView({
   error,
   refresh,
 }: DashboardViewProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (loading && !data)
     return (
       <Screen
@@ -96,7 +102,7 @@ export function DashboardView({
           subtitle="Your inventory, exactly where you need it."
         />
       }
-      refreshControl={createRefreshControl(loading, refresh)}
+      refreshControl={createRefreshControl(loading, refresh, colors)}
     >
       <View style={styles.summary}>
         <Metric label="Units in stock" value={metrics.totalUnits} filter="in_stock" />
@@ -140,7 +146,7 @@ export function DashboardView({
       {[...data.outOfStock, ...data.lowStock]
         .slice(0, 3)
         .map((cover, index) => (
-          <CoverCard
+          <DeviceCard
             key={`${cover.id}-${index}`}
             cover={cover}
             onPress={() =>
@@ -182,7 +188,7 @@ export function DashboardView({
             <View style={styles.activityDot} />
             <View style={styles.activityCopy}>
               <Text numberOfLines={1} style={styles.activityTitle}>
-                {item.coverName || "Stock update"}
+                {item.compatibleModels?.join(" · ") || "Phone stock update"}
               </Text>
               <Text style={commonStyles.caption}>
                 {titleCase(item.type)} · {item.actor || "Shop owner"} ·{" "}
@@ -207,7 +213,7 @@ export function DashboardView({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   summary: { flexDirection: "row", gap: spacing.sm },
   metric: {
     flex: 1,

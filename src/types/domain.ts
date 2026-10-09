@@ -5,12 +5,11 @@ export type TransactionType =
   | "adjustment"
   | "return"
   | "damaged"
-  | "opening_balance";
+  | "opening_balance"
+  | "compatibility_link";
 
 export interface Cover {
   id: string;
-  name: string;
-  sku: string;
   quantityOnHand: number;
   reorderThreshold: number;
   compatibleModels: string[];
@@ -33,6 +32,7 @@ export interface Device {
   aliases?: string[];
   images?: { primary?: string | null; back?: string | null };
   inventory?: { unitsOnHand: number; coverVariants: number };
+  compatibleDevices?: Pick<Device, "id" | "brand" | "model" | "images">[];
 }
 export interface DevicePage {
   items: Device[];
@@ -47,6 +47,12 @@ export interface DeviceBrand {
 export interface CreateDeviceInput {
   brand: string;
   model: string;
+  imageUrl?: string;
+}
+export interface UpdateDeviceInput {
+  brand: string;
+  model: string;
+  imageUrl?: string;
 }
 
 export interface InventoryTransaction {
@@ -60,10 +66,9 @@ export interface InventoryTransaction {
   note?: string | null;
   actor?: string | null;
   createdAt: string;
-  coverName?: string;
-  coverSku?: string;
   compatibleModels?: string[];
   displayDevice?: Pick<Device, "brand" | "model" | "images">;
+  compatibleDevices?: Pick<Device, "id" | "brand" | "model" | "images">[];
 }
 
 export interface DashboardData {
@@ -89,9 +94,11 @@ export interface StockMutation {
   cover: Cover;
   transaction: InventoryTransaction;
 }
+export interface DeviceCompatibilityLinkResult {
+  compatibleDevices: Device[];
+  linked: boolean;
+}
 export interface CreateCoverInput {
-  name: string;
-  sku: string;
   startingQuantity: number;
   compatibleModels: string[];
 }

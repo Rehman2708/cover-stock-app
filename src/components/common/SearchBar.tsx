@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -7,7 +8,8 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { colors, radius, spacing } from "../../design-system/tokens";
+import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
+import { radius, spacing } from "../../design-system/tokens";
 
 interface SearchBarProps {
   value: string;
@@ -25,6 +27,8 @@ export function SearchBar({
   loading = false,
   placeholder = "Search phone model",
 }: SearchBarProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.form}>
       <Ionicons color={colors.muted} name="search-outline" size={21} />
@@ -65,7 +69,7 @@ export function SearchBar({
     </View>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   form: {
     alignItems: "center",
     backgroundColor: colors.surface,

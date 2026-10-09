@@ -3,7 +3,9 @@ import type {
   AuthSession,
   AuthUser,
   Cover,
+  DeviceCompatibilityLinkResult,
   CreateDeviceInput,
+  UpdateDeviceInput,
   CreateCoverInput,
   DashboardData,
   CoverPage,
@@ -108,8 +110,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  updateDevice: (id: string, input: UpdateDeviceInput) =>
+    request<Device>(`/api/devices/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
   getDeviceBrands: () => request<DeviceBrand[]>("/api/devices/brands"),
   getDevice: (id: string) => request<DeviceDetail>(`/api/devices/${id}`),
+  removeDevice: (id: string) =>
+    request<void>(`/api/devices/${id}`, { method: "DELETE" }),
+  linkCompatibleDevice: (deviceId: string, compatibleDeviceId: string) =>
+    request<DeviceCompatibilityLinkResult>(
+      `/api/devices/${deviceId}/compatible-devices/${compatibleDeviceId}`,
+      { method: "POST" },
+    ),
+  unlinkCompatibleDevice: (deviceId: string, compatibleDeviceId: string) =>
+    request<DeviceCompatibilityLinkResult>(
+      `/api/devices/${deviceId}/compatible-devices/${compatibleDeviceId}/unlink`,
+      { method: "POST" },
+    ),
   getTransactions: ({
     before,
     query,
