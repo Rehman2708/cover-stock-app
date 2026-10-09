@@ -52,6 +52,8 @@ function RootNavigator() {
         <Stack.Screen name="cover/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="device/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="brand/[brand]" options={{ headerShown: false }} />
+        <Stack.Screen name="archived-devices" options={{ headerShown: false }} />
+        <Stack.Screen name="archived-device/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>

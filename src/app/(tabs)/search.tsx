@@ -50,7 +50,11 @@ export default function SearchRoute() {
       : "all";
   const [stockSort, setStockSort] = useState<InventorySort>("recent");
   const [searchSort, setSearchSort] = useState<SearchSort>("relevance");
-  const inventory = useInventoryViewModel(stockFilter, stockSort);
+  const inventory = useInventoryViewModel(
+    stockFilter,
+    stockSort,
+    mode === "stock",
+  );
   const refreshInventory = inventory.refresh;
   const { query, setQuery, results, loading, error, searchNow, loadMore } =
     useDebouncedSearch({ sort: searchSort });
@@ -131,11 +135,11 @@ export default function SearchRoute() {
     setRefreshing(true);
     await Promise.all([
       loadBrands(),
-      refreshInventory(),
+      mode === "stock" ? refreshInventory() : Promise.resolve(),
       query.trim() ? searchNow() : Promise.resolve(),
     ]);
     setRefreshing(false);
-  }, [loadBrands, query, refreshInventory, searchNow]);
+  }, [loadBrands, mode, query, refreshInventory, searchNow]);
   const hasSearchQuery = Boolean(query.trim());
   // Older API deployments do not include hasStock, so keep every brand in the
   // stocked section until the stock-aware response is available.
@@ -228,7 +232,13 @@ export default function SearchRoute() {
         onChange={(nextMode) => router.setParams({ mode: nextMode })}
         options={[
           { label: "Browse", value: "browse" },
-          { label: `Stock (${inventory.total})`, value: "stock" },
+          {
+            label:
+              mode === "stock" && inventory.loading
+                ? "Stock"
+                : `Stock (${inventory.total})`,
+            value: "stock",
+          },
         ]}
       />
       {mode === "stock" ? (

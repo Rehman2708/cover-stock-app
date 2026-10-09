@@ -133,7 +133,9 @@ export function DashboardView({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push("/search")}
+          onPress={() =>
+            router.push({ pathname: "/inventory", params: { mode: "stock" } })
+          }
           style={({ pressed }) => [styles.addAction, pressed && styles.pressed]}
         >
           <Ionicons color={colors.white} name="add" size={24} />
@@ -145,7 +147,10 @@ export function DashboardView({
         <Text
           accessibilityRole="button"
           onPress={() =>
-            router.push({ pathname: "/inventory", params: { mode: "stock" } })
+            router.push({
+              pathname: "/inventory",
+              params: { mode: "stock", filter: "attention" },
+            })
           }
           style={styles.activityLink}
         >
@@ -207,8 +212,11 @@ export function DashboardView({
             <Text
               style={[styles.delta, item.quantityDelta < 0 && styles.deltaOut]}
             >
-              {item.quantityDelta > 0 ? "+" : ""}
-              {item.quantityDelta}
+              {item.type === "compatibility_link"
+                ? "Linked"
+                : item.type === "compatibility_unlink"
+                  ? "Unlinked"
+                  : `${item.quantityDelta > 0 ? "+" : ""}${item.quantityDelta}`}
             </Text>
           </Pressable>
         ))

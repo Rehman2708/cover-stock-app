@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { router } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BottomSheetModal } from "../../components/common/BottomSheetModal";
 import { Button } from "../../components/common/Button";
@@ -324,6 +325,31 @@ export default function ProfileRoute() {
                 </Pressable>
               );
             })}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Catalogue</Text>
+        <View style={styles.card}>
+          <View style={styles.detailRow}>
+            <View style={styles.icon}>
+              <Ionicons color={colors.primary} name="archive-outline" size={20} />
+            </View>
+            <View style={styles.detailCopy}>
+              <Text style={styles.value}>Archived devices</Text>
+              <Text style={styles.helper}>
+                View deleted phones or restore them to the catalogue.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityLabel="View archived devices"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => router.push("/archived-devices")}
+            >
+              <Text style={styles.action}>View</Text>
+            </Pressable>
           </View>
         </View>
       </View>

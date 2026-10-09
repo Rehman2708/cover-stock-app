@@ -27,6 +27,7 @@ const matchesFilter = (cover: Cover, filter: InventoryFilter) => {
 export function useInventoryViewModel(
   filter: InventoryFilter = "all",
   sort: InventorySort = "recent",
+  enabled = true,
 ) {
   const latestStockMutation = useDataSyncStore(
     (state) => state.latestStockMutation,
@@ -52,6 +53,7 @@ export function useInventoryViewModel(
     total: 0,
   });
   const load = useCallback(async () => {
+    if (!enabled) return;
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
       const page = await api.getCovers({ filter, sort });
@@ -70,7 +72,7 @@ export function useInventoryViewModel(
           error instanceof Error ? error.message : "Unable to load inventory.",
       }));
     }
-  }, [filter, sort]);
+  }, [enabled, filter, sort]);
   const covers = useMemo(() => {
     if (!latestStockMutation) return state.covers;
     const index = state.covers.findIndex(
@@ -104,6 +106,7 @@ export function useInventoryViewModel(
   }, [covers, filter, latestStockMutation, state.covers, state.total]);
   useFocusEffect(
     useCallback(() => {
+      if (!enabled) return undefined;
       let active = true;
       const requestedRevision = deviceRevision;
       const listKey = `${filter}:${sort}`;
@@ -143,12 +146,13 @@ export function useInventoryViewModel(
       return () => {
         active = false;
       };
-    }, [deviceRevision, filter, sort]),
+    }, [deviceRevision, enabled, filter, sort]),
   );
   const loadMore = useCallback(async () => {
     const offset = state.nextOffset;
     if (
       offset === null ||
+      !enabled ||
       state.loading ||
       state.covers.length >= maximumLoadedCovers
     )
@@ -179,7 +183,7 @@ export function useInventoryViewModel(
             : "Unable to load more inventory.",
       }));
     }
-  }, [filter, sort, state.covers.length, state.loading, state.nextOffset]);
+  }, [enabled, filter, sort, state.covers.length, state.loading, state.nextOffset]);
   const updateStock = useCallback(
     async (
       cover: Cover,

@@ -27,7 +27,7 @@ export function AppHeader({
         <Text style={styles.eyebrow}>{eyebrow}</Text>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? (
-          <Text numberOfLines={1} style={[commonStyles.body, styles.subtitle]}>
+          <Text numberOfLines={2} style={[commonStyles.body, styles.subtitle]}>
             {subtitle}
           </Text>
         ) : null}
@@ -52,5 +52,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginBottom: spacing.xxs,
   },
   title: { color: colors.ink, fontSize: 30, fontWeight: "900", lineHeight: 35 },
-  subtitle: { marginTop: spacing.xxs, maxWidth: 280 },
+  subtitle: { marginTop: spacing.xxs },
 });

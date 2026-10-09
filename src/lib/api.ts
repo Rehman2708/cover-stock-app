@@ -124,9 +124,25 @@ export const api = {
       body: JSON.stringify(input),
     }),
   getDeviceBrands: () => request<DeviceBrand[]>("/api/devices/brands"),
+  getArchivedDevices: ({
+    sort = "model_asc",
+    offset = 0,
+    limit = 50,
+  }: {
+    sort?: "model_asc" | "model_desc";
+    offset?: number;
+    limit?: number;
+  } = {}) =>
+    request<DevicePage>(
+      `/api/devices/archived?offset=${offset}&limit=${limit}&sort=${sort}`,
+    ),
+  getArchivedDevice: (id: string) =>
+    request<Device>(`/api/devices/${id}/archived`),
   getDevice: (id: string) => request<DeviceDetail>(`/api/devices/${id}`),
   removeDevice: (id: string) =>
     request<void>(`/api/devices/${id}`, { method: "DELETE" }),
+  restoreDevice: (id: string) =>
+    request<Device>(`/api/devices/${id}/restore`, { method: "POST" }),
   linkCompatibleDevice: (deviceId: string, compatibleDeviceId: string) =>
     request<DeviceCompatibilityLinkResult>(
       `/api/devices/${deviceId}/compatible-devices/${compatibleDeviceId}`,

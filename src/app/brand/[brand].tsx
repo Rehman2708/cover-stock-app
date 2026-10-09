@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";
@@ -193,18 +193,20 @@ export default function BrandRoute() {
         </>
       ) : (
         <>
-          <Text style={commonStyles.sectionTitle}>{totalModels} models</Text>
-          <ListToolbar
-            sort={{
-              accessibilityLabel: "Sort phone models",
-              value: modelSort,
-              onApply: setModelSort,
-              options: [
-                { label: "Name: A–Z", value: "model_asc" },
-                { label: "Name: Z–A", value: "model_desc" },
-              ],
-            }}
-          />
+          <View style={styles.modelsHeader}>
+            <Text style={commonStyles.sectionTitle}>{totalModels} models</Text>
+            <ListToolbar
+              sort={{
+                accessibilityLabel: "Sort phone models",
+                value: modelSort,
+                onApply: setModelSort,
+                options: [
+                  { label: "Name: A–Z", value: "model_asc" },
+                  { label: "Name: Z–A", value: "model_desc" },
+                ],
+              }}
+            />
+          </View>
           {loadingModels && !models.length ? (
             <SkeletonList count={5} variant="deviceWithoutBrand" />
           ) : null}
@@ -235,6 +237,11 @@ function DeviceRow({ device }: { device: Device }) {
   );
 }
 const styles = StyleSheet.create({
+  modelsHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   error: {
     backgroundColor: colors.dangerSoft,
     borderRadius: radius.md,

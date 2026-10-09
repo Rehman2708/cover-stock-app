@@ -54,6 +54,7 @@ export function StockActions({
   };
   const commit = async () => {
     if (!action) return;
+    setError(null);
     setUpdating(true);
     try {
       await onUpdate(action, quantity);
@@ -69,6 +70,7 @@ export function StockActions({
   };
   const undoLast = async () => {
     if (!undo) return;
+    setError(null);
     setUpdating(true);
     try {
       await onUpdate(undo.type, undo.quantity);
@@ -136,6 +138,11 @@ export function StockActions({
             variant="ghost"
           />
         </View>
+      ) : null}
+      {error && !action ? (
+        <Text accessibilityLiveRegion="polite" style={styles.error}>
+          {error}
+        </Text>
       ) : null}
       <BottomSheetModal
         contentStyle={styles.sheet}

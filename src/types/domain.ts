@@ -30,6 +30,8 @@ export interface Device {
   id: string;
   brand: string;
   model: string;
+  status?: "active" | "archived";
+  archivedAt?: string;
   aliases?: string[];
   images?: { primary?: string | null; back?: string | null };
   inventory?: { unitsOnHand: number; coverVariants: number };
