@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import { commonStyles } from "../../design-system/styles";
 import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
 import { spacing } from "../../design-system/tokens";

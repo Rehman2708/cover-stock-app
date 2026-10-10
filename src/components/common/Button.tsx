@@ -1,6 +1,7 @@
 import type { GestureResponderEvent } from "react-native";
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
+import { AppText as Text } from "./AppText";
 import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
 import { radius, spacing } from "../../design-system/tokens";
 

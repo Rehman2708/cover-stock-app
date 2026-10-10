@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import { type ThemeColors, useThemedStyles } from "../../design-system/ThemeProvider";
 import { radius } from "../../design-system/tokens";
 

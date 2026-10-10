@@ -1,12 +1,7 @@
 import { useState } from "react";
 import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+  Pressable, ScrollView, StyleSheet, View,  } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "./AppText";
 import { api } from "../../lib/api";
 import { useDataSyncStore } from "../../lib/dataSync";
 import type { Device, DeviceBrand } from "../../types/domain";

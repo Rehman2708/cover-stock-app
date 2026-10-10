@@ -4,7 +4,7 @@ import { StyleSheet, View } from "react-native";
 import { useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
-import { radius, shadow, spacing } from "../../design-system/tokens";
+import { font, radius, shadow, spacing } from "../../design-system/tokens";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -107,7 +107,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginHorizontal: 24,
   },
   tabItem: { borderRadius: radius.pill, marginHorizontal: 2 },
-  tabLabel: { fontSize: 11, fontWeight: "800", marginTop: 0 },
+  tabLabel: { fontFamily: font.family.bold, fontSize: 11, fontWeight: "800", marginTop: 0 },
   iconBadge: {
     alignItems: "center",
     borderRadius: radius.pill,

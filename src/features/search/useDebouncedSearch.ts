@@ -5,6 +5,10 @@ import type { SearchResults } from "../../types/domain";
 
 const emptyResults = (): SearchResults => ({ covers: [], devices: [] });
 const maximumSearchResults = 60;
+const searchCache = new Map<
+  string,
+  { query: string; results: SearchResults }
+>();
 export type SearchSort = "relevance" | "name_asc" | "name_desc";
 
 interface SearchState {
@@ -21,19 +25,32 @@ export function useDebouncedSearch({
   brand,
   debounceMs = 300,
   sort = "relevance",
-}: { brand?: string; debounceMs?: number; sort?: SearchSort } = {}) {
+  cacheKey,
+}: {
+  brand?: string;
+  debounceMs?: number;
+  sort?: SearchSort;
+  /** Keeps a route's search results intact while navigating to a detail page. */
+  cacheKey?: string;
+} = {}) {
+  const cachedSearch = cacheKey ? searchCache.get(cacheKey) : undefined;
   const latestStockMutation = useDataSyncStore(
     (state) => state.latestStockMutation,
   );
   const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => cachedSearch?.query ?? "");
   const [state, setState] = useState<SearchState>({
-    results: emptyResults(),
+    results: cachedSearch?.results ?? emptyResults(),
     loading: false,
     error: null,
   });
   const latestRequest = useRef(0);
   const handledDeviceRevision = useRef(deviceRevision);
+
+  useEffect(() => {
+    if (!cacheKey) return;
+    searchCache.set(cacheKey, { query, results: state.results });
+  }, [cacheKey, query, state.results]);
 
   const runSearch = useCallback(
     async (term: string, requestId: number, offset = 0, append = false) => {

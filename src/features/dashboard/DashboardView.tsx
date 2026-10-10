@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/common/AppText";
 import { AppHeader } from "../../components/common/AppHeader";
 import { Button } from "../../components/common/Button";
 import { DeviceCard } from "../../components/common/DeviceCard";

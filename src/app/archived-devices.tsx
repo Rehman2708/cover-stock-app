@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../components/common/AppText";
+import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppHeader } from "../components/common/AppHeader";
 import { BackButton } from "../components/common/BackButton";
@@ -59,11 +60,12 @@ export default function ArchivedDevicesRoute() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
+  // Returning from an archived-device detail screen should retain loaded pages.
+  // Refresh remains available for an explicit server reload.
+  useEffect(() => {
+    const timeout = setTimeout(() => void load(), 0);
+    return () => clearTimeout(timeout);
+  }, [load]);
 
   const restore = async (device: Device) => {
     setRestoringId(device.id);

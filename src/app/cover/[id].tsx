@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+  Alert, Pressable, StyleSheet, View,  } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/common/AppText";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";

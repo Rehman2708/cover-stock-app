@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "../design-system/ThemeProvider";
@@ -7,6 +8,15 @@ import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
 import { SkeletonList } from "../components/common/Skeleton";
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    "SFPro-Display-Regular": require("../../assets/fonts/SF-Pro-Display-Regular.ttf"),
+    "SFPro-Display-Bold": require("../../assets/fonts/SF-Pro-Display-Bold.ttf"),
+    "SFPro-Text-Medium": require("../../assets/fonts/sf-pro-text-medium.ttf"),
+    "SFPro-Text-Semibold": require("../../assets/fonts/sf-pro-text-semibold.ttf"),
+  });
+
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>

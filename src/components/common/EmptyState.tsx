@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import { commonStyles } from "../../design-system/styles";
 import { type ThemeColors, useThemedStyles } from "../../design-system/ThemeProvider";
 import { spacing } from "../../design-system/tokens";

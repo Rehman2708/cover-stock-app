@@ -1,10 +1,5 @@
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, View,  } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/common/AppText";
 import { router } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { DeviceCard } from "../../components/common/DeviceCard";

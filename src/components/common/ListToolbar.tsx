@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
 import { radius, spacing } from "../../design-system/tokens";
 import { BottomSheetModal } from "./BottomSheetModal";

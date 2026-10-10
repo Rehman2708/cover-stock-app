@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import type { StockMutation, TransactionType } from "../../types/domain";
 import { type ThemeColors, useThemedStyles } from "../../design-system/ThemeProvider";
 import { radius, spacing } from "../../design-system/tokens";
@@ -87,7 +88,7 @@ export function StockActions({
   };
   const canConfirm = !removing || quantity <= quantityOnHand;
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, compact && styles.compactWrap]}>
       <View style={styles.actions}>
         {compact ? (
           <View style={styles.action}>
@@ -214,6 +215,7 @@ export function StockActions({
 }
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: { gap: spacing.sm, marginTop: spacing.xs },
+  compactWrap: { marginTop: 0 },
   actions: { flex: 1, flexDirection: "row", gap: spacing.sm },
   action: { flex: 1 },
   undo: {

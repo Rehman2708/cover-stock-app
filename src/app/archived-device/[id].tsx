@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Modal, Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/common/AppText";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import { AppHeader } from "../../components/common/AppHeader";

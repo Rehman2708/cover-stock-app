@@ -1,12 +1,7 @@
 import { useMemo } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+  ActivityIndicator, Pressable, StyleSheet, View,  } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "./AppText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
 import { radius, spacing } from "../../design-system/tokens";

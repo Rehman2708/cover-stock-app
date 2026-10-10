@@ -101,17 +101,19 @@ export const api = {
     request<InventoryTransaction[]>(`/api/covers/${id}/transactions`),
   getDevices: ({
     brand,
+    filter = "all",
     sort = "model_asc",
     offset = 0,
     limit = 50,
   }: {
     brand?: string;
+    filter?: "all" | "in_stock" | "out_of_stock";
     sort?: "model_asc" | "model_desc";
     offset?: number;
     limit?: number;
   } = {}) =>
     request<DevicePage>(
-      `/api/devices?offset=${offset}&limit=${limit}&sort=${sort}${brand ? `&brand=${encodeURIComponent(brand)}` : ""}`,
+      `/api/devices?offset=${offset}&limit=${limit}&sort=${sort}&stock=${filter}${brand ? `&brand=${encodeURIComponent(brand)}` : ""}`,
     ),
   createDevice: (input: CreateDeviceInput) =>
     request<Device>("/api/devices", {

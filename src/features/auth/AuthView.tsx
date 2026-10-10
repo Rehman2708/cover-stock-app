@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ComponentProps } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/common/AppText";
 import { Button } from "../../components/common/Button";
 import { Screen } from "../../components/common/Screen";
 import {

@@ -50,7 +50,17 @@
       ],
       "expo-router",
       "expo-status-bar",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/SF-Pro-Display-Regular.ttf",
+            "./assets/fonts/SF-Pro-Display-Bold.ttf",
+            "./assets/fonts/sf-pro-text-medium.ttf",
+            "./assets/fonts/sf-pro-text-semibold.ttf"
+          ]
+        }
+      ],
       "expo-secure-store"
     ]
   }

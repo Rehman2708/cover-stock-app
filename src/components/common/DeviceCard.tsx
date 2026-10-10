@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { GestureResponderEvent } from "react-native";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { commonStyles } from "../../design-system/styles";
 import {

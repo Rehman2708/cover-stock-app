@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+  Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, View,  } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/common/AppText";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";
@@ -48,7 +39,8 @@ export default function DeviceDetailRoute() {
   const [linkCandidates, setLinkCandidates] = useState<Device[]>([]);
   const [linkCandidatesError, setLinkCandidatesError] = useState<string | null>(null);
   const [loadingLinkCandidates, setLoadingLinkCandidates] = useState(false);
-  const [linkingDeviceId, setLinkingDeviceId] = useState<string | null>(null);
+  const [selectedLinkDevices, setSelectedLinkDevices] = useState<Device[]>([]);
+  const [linkingDevices, setLinkingDevices] = useState(false);
   const [unlinkingDeviceId, setUnlinkingDeviceId] = useState<string | null>(null);
   const [removingDevice, setRemovingDevice] = useState(false);
   const [deviceOptionsOpen, setDeviceOptionsOpen] = useState(false);
@@ -185,6 +177,7 @@ export default function DeviceDetailRoute() {
     setLinkCandidates([]);
     setLinkCandidatesError(null);
     setLoadingLinkCandidates(false);
+    setSelectedLinkDevices([]);
     setLinkPickerOpen(true);
   };
   const openEdit = () => {
@@ -233,7 +226,7 @@ export default function DeviceDetailRoute() {
       setLoadingLinkCandidates(true);
       setLinkCandidatesError(null);
       api
-        .search(query)
+        .search(query, detail?.device.brand)
         .then((results) => {
           if (active) setLinkCandidates(results.devices);
         })
@@ -253,43 +246,63 @@ export default function DeviceDetailRoute() {
       active = false;
       clearTimeout(timeout);
     };
-  }, [deviceQuery, linkPickerOpen]);
-  const linkDevice = async (compatibleDevice: Device) => {
-    if (!detail) return;
-    setLinkingDeviceId(compatibleDevice.id);
-    try {
-      const result = await api.linkCompatibleDevice(id, compatibleDevice.id);
-      if (!result.linked) {
-        Alert.alert("Already linked", "These phones already share compatible-cover availability.");
-        return;
+  }, [detail?.device.brand, deviceQuery, linkPickerOpen]);
+  const toggleLinkSelection = (device: Device) => {
+    if (linkingDevices) return;
+    setSelectedLinkDevices((current) =>
+      current.some((item) => item.id === device.id)
+        ? current.filter((item) => item.id !== device.id)
+        : [...current, device],
+    );
+  };
+  const linkSelectedDevices = async () => {
+    if (!detail || !selectedLinkDevices.length) return;
+    setLinkingDevices(true);
+    const linkedIds = new Set<string>();
+    const failures: string[] = [];
+    let latestResult: Awaited<
+      ReturnType<typeof api.linkCompatibleDevice>
+    > | null = null;
+    for (const device of selectedLinkDevices) {
+      try {
+        const result = await api.linkCompatibleDevice(id, device.id);
+        if (result.linked) {
+          linkedIds.add(device.id);
+          latestResult = result;
+        } else {
+          failures.push(`${device.brand} ${device.model}`);
+        }
+      } catch {
+        failures.push(`${device.brand} ${device.model}`);
       }
+    }
+    if (latestResult) {
       setDetail((current) =>
         current
-          ? {
-              ...current,
-              compatibleDevices: result.compatibleDevices,
-            }
+          ? { ...current, compatibleDevices: latestResult.compatibleDevices }
           : current,
       );
       publishDevice({
         ...detail.device,
-        compatibleDevices: result.compatibleDevices,
+        compatibleDevices: latestResult.compatibleDevices,
       });
+    }
+    setSelectedLinkDevices((current) =>
+      current.filter((device) => !linkedIds.has(device.id)),
+    );
+    setLinkingDevices(false);
+    if (!failures.length) {
       setLinkPickerOpen(false);
       Alert.alert(
         "Phones linked",
-        `${detail.device.brand} ${detail.device.model} and ${compatibleDevice.brand} ${compatibleDevice.model} now share compatible-cover availability. No stock was added or changed.`,
+        `${linkedIds.size} phone${linkedIds.size === 1 ? "" : "s"} now share compatible-cover availability. No stock was added or changed.`,
       );
-    } catch (reason) {
-      Alert.alert(
-        "Couldn’t link phone",
-        reason instanceof Error
-          ? reason.message
-          : "Check the connection and try again.",
-      );
-    } finally {
-      setLinkingDeviceId(null);
+      return;
     }
+    Alert.alert(
+      linkedIds.size ? "Some phones couldn’t be linked" : "Couldn’t link phones",
+      `${linkedIds.size ? `${linkedIds.size} linked. ` : ""}Try again for ${failures.join(", ")}.`,
+    );
   };
   const unlinkDevice = async (compatibleDevice: Device) => {
     if (!detail) return;
@@ -328,14 +341,14 @@ export default function DeviceDetailRoute() {
       setUnlinkingDeviceId(null);
     }
   };
-  const confirmLink = (compatibleDevice: Device) => {
-    if (!detail) return;
+  const confirmSelectedLinks = () => {
+    if (!detail || !selectedLinkDevices.length) return;
     Alert.alert(
-      "Link these phones?",
-      `${detail.device.brand} ${detail.device.model} and ${compatibleDevice.brand} ${compatibleDevice.model} will share compatible-cover availability. No stock is required.`,
+      `Link ${selectedLinkDevices.length} phone${selectedLinkDevices.length === 1 ? "" : "s"}?`,
+      `${detail.device.brand} ${detail.device.model} will share compatible-cover availability with ${selectedLinkDevices.map((device) => `${device.brand} ${device.model}`).join(", ")}. No stock is required.`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Link phones", onPress: () => void linkDevice(compatibleDevice) },
+        { text: "Link phones", onPress: () => void linkSelectedDevices() },
       ],
     );
   };
@@ -479,21 +492,22 @@ export default function DeviceDetailRoute() {
         closeAccessibilityLabel="Close phone picker"
         contentStyle={styles.linkSheet}
         height="80%"
-        onClose={() => setLinkPickerOpen(false)}
+        onClose={() => !linkingDevices && setLinkPickerOpen(false)}
         visible={linkPickerOpen}
       >
               <View style={styles.sheetHeader}>
                 <View style={styles.sheetCopy}>
-                  <Text style={styles.sheetTitle}>Link compatible phone</Text>
+                  <Text style={styles.sheetTitle}>Link compatible phones</Text>
                   <Text style={styles.sheetCaption}>
-                    Search {detail.device.brand} phones only. Other brands cannot share a cover.
+                    Search and select {detail.device.brand} phones. Other brands cannot share a cover.
                   </Text>
                 </View>
                 <Pressable
                   accessibilityLabel="Close phone picker"
                   accessibilityRole="button"
+                  disabled={linkingDevices}
                   hitSlop={12}
-                  onPress={() => setLinkPickerOpen(false)}
+                  onPress={() => !linkingDevices && setLinkPickerOpen(false)}
                   style={styles.closeButton}
                 >
                   <Text style={styles.closeLabel}>×</Text>
@@ -521,14 +535,14 @@ export default function DeviceDetailRoute() {
                           accessibilityLabel={`Unlink ${device.brand} ${device.model}`}
                           accessibilityRole="button"
                           disabled={
-                            linkingDeviceId !== null || unlinkingDeviceId !== null
+                            linkingDevices || unlinkingDeviceId !== null
                           }
                           key={device.id}
                           onPress={() => confirmUnlink(device)}
                           style={({ pressed }) => [
                             styles.candidate,
                             (pressed ||
-                              linkingDeviceId !== null ||
+                              linkingDevices ||
                               unlinkingDeviceId !== null) &&
                               styles.pressed,
                           ]}
@@ -563,17 +577,24 @@ export default function DeviceDetailRoute() {
                     <View style={styles.candidateList}>
                       {availableLinkCandidates.map((device) => (
                         <Pressable
-                          accessibilityLabel={`Link ${device.brand} ${device.model}`}
+                          accessibilityLabel={`Select ${device.brand} ${device.model} to link`}
                           accessibilityRole="button"
-                          disabled={
-                            linkingDeviceId !== null || unlinkingDeviceId !== null
-                          }
+                          accessibilityState={{
+                            disabled: linkingDevices || unlinkingDeviceId !== null,
+                            selected: selectedLinkDevices.some(
+                              (item) => item.id === device.id,
+                            ),
+                          }}
+                          disabled={linkingDevices || unlinkingDeviceId !== null}
                           key={device.id}
-                          onPress={() => confirmLink(device)}
+                          onPress={() => toggleLinkSelection(device)}
                           style={({ pressed }) => [
                             styles.candidate,
+                            selectedLinkDevices.some(
+                              (item) => item.id === device.id,
+                            ) && styles.candidateSelected,
                             (pressed ||
-                              linkingDeviceId !== null ||
+                              linkingDevices ||
                               unlinkingDeviceId !== null) &&
                               styles.pressed,
                           ]}
@@ -586,9 +607,23 @@ export default function DeviceDetailRoute() {
                               {device.brand}
                             </Text>
                           </View>
-                          <Text style={styles.linkAction}>
-                            {linkingDeviceId === device.id ? "Linking…" : "Link"}
-                          </Text>
+                          <View
+                            pointerEvents="none"
+                            style={[
+                              styles.selectionControl,
+                              selectedLinkDevices.some(
+                                (item) => item.id === device.id,
+                              ) && styles.selectionControlSelected,
+                            ]}
+                          >
+                            <Text style={styles.selectionMark}>
+                              {selectedLinkDevices.some(
+                                (item) => item.id === device.id,
+                              )
+                                ? "✓"
+                                : ""}
+                            </Text>
+                          </View>
                         </Pressable>
                       ))}
                     </View>
@@ -599,6 +634,16 @@ export default function DeviceDetailRoute() {
                   )
                 ) : null}
               </ScrollView>
+              <Button
+                disabled={!selectedLinkDevices.length || linkingDevices}
+                label={
+                  linkingDevices
+                    ? "Linking phones…"
+                    : `Link ${selectedLinkDevices.length || "selected"} phone${selectedLinkDevices.length === 1 ? "" : "s"}`
+                }
+                loading={linkingDevices}
+                onPress={confirmSelectedLinks}
+              />
       </BottomSheetModal>
       <BottomSheetModal
         contentStyle={styles.optionsSheet}
@@ -896,10 +941,24 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
   },
+  candidateSelected: { backgroundColor: colors.primarySoft },
   candidateCopy: { flex: 1, gap: 3 },
   candidateName: { color: colors.ink, fontSize: 15, fontWeight: "800" },
   candidateMeta: { color: colors.muted, fontSize: 13 },
-  linkAction: { color: colors.primary, fontSize: 14, fontWeight: "900" },
+  selectionControl: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: "center",
+    width: 24,
+  },
+  selectionControlSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  selectionMark: { color: colors.white, fontSize: 15, fontWeight: "900" },
   unlinkAction: { color: colors.danger, fontSize: 14, fontWeight: "900" },
   emptyCandidates: { color: colors.muted, fontSize: 14, lineHeight: 20, paddingVertical: spacing.sm },
 });

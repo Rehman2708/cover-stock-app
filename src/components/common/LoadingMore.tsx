@@ -1,4 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import { useTheme } from "../../design-system/ThemeProvider";
 import { spacing } from "../../design-system/tokens";
 

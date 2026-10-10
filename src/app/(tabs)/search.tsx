@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/common/AppText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
@@ -57,7 +58,7 @@ export default function SearchRoute() {
   );
   const refreshInventory = inventory.refresh;
   const { query, setQuery, results, loading, error, searchNow, loadMore } =
-    useDebouncedSearch({ sort: searchSort });
+    useDebouncedSearch({ cacheKey: "catalogue-search", sort: searchSort });
   const [brands, setBrands] = useState<DeviceBrand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [brandError, setBrandError] = useState<string | null>(null);

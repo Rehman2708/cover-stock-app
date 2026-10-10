@@ -1,13 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+  Alert, Pressable, StyleSheet, View,  } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/common/AppText";
 import { router } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BottomSheetModal } from "../../components/common/BottomSheetModal";

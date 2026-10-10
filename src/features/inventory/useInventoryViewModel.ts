@@ -1,5 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import type { Cover, StockMutation, TransactionType } from "../../types/domain";
 import { useDataSyncStore } from "../../lib/dataSync";
@@ -104,8 +103,8 @@ export function useInventoryViewModel(
       );
     return covers !== state.covers ? state.total + 1 : state.total;
   }, [covers, filter, latestStockMutation, state.covers, state.total]);
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(
+    () => {
       if (!enabled) return undefined;
       let active = true;
       const requestedRevision = deviceRevision;
@@ -146,7 +145,8 @@ export function useInventoryViewModel(
       return () => {
         active = false;
       };
-    }, [deviceRevision, enabled, filter, sort]),
+    },
+    [deviceRevision, enabled, filter, sort],
   );
   const loadMore = useCallback(async () => {
     const offset = state.nextOffset;

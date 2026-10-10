@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import { colors, radius, spacing } from "../../design-system/tokens";
 import type { Cover, StockTone } from "../../types/domain";
 

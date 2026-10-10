@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { AppText as Text } from "../components/common/AppText";
 import { AppHeader } from "../components/common/AppHeader";
 import { Screen } from "../components/common/Screen";
 import { commonStyles } from "../design-system/styles";

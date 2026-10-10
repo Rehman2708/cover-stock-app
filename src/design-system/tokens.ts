@@ -31,7 +31,12 @@ export const spacing = {
 };
 export const radius = { sm: 10, md: 14, lg: 18, pill: 999 };
 export const font = {
-  family: { regular: "System", medium: "System", bold: "System" },
+  family: {
+    regular: "SFPro-Display-Regular",
+    medium: "SFPro-Text-Medium",
+    semibold: "SFPro-Text-Semibold",
+    bold: "SFPro-Display-Bold",
+  },
   size: { caption: 12, body: 15, label: 14, title: 22, display: 30 },
   lineHeight: { caption: 17, body: 22, label: 20, title: 28, display: 36 },
 };

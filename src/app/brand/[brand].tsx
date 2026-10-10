@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import { AppText as Text } from "../../components/common/AppText";
 import { router, useLocalSearchParams } from "expo-router";
 import { AppHeader } from "../../components/common/AppHeader";
 import { BackButton } from "../../components/common/BackButton";
+import { AddDeviceModal } from "../../components/common/AddDeviceModal";
+import { Button } from "../../components/common/Button";
 import { DeviceCard } from "../../components/common/DeviceCard";
 import { EmptyState } from "../../components/common/EmptyState";
 import { ListToolbar } from "../../components/common/ListToolbar";
@@ -18,18 +28,38 @@ import {
   type SearchSort,
   useDebouncedSearch,
 } from "../../features/search/useDebouncedSearch";
-import type { Device } from "../../types/domain";
+import type { Device, DeviceBrand } from "../../types/domain";
 
 const maximumLoadedModels = 100;
+const deleteRevealWidth = 92;
 type ModelSort = "model_asc" | "model_desc";
+type AvailabilityFilter = "all" | "in_stock" | "out_of_stock";
+interface BrandBrowseSnapshot {
+  models: Device[];
+  nextOffset: number | null;
+  totalModels: number;
+  modelSort: ModelSort;
+  availabilityFilter: AvailabilityFilter;
+  searchSort: SearchSort;
+}
+const brandBrowseCache = new Map<string, BrandBrowseSnapshot>();
 
 export default function BrandRoute() {
   const { brand } = useLocalSearchParams<{ brand: string }>();
-  const [models, setModels] = useState<Device[]>([]);
-  const modelsRef = useRef<Device[]>([]);
+  const cachedSnapshot = brandBrowseCache.get(brand);
+  const [models, setModels] = useState<Device[]>(cachedSnapshot?.models ?? []);
+  const modelsRef = useRef<Device[]>(cachedSnapshot?.models ?? []);
   const modelsLoadingRef = useRef(false);
-  const [modelSort, setModelSort] = useState<ModelSort>("model_asc");
-  const [searchSort, setSearchSort] = useState<SearchSort>("relevance");
+  const [modelSort, setModelSort] = useState<ModelSort>(
+    cachedSnapshot?.modelSort ?? "model_asc",
+  );
+  const [availabilityFilter, setAvailabilityFilter] =
+    useState<AvailabilityFilter>(
+      cachedSnapshot?.availabilityFilter ?? "all",
+    );
+  const [searchSort, setSearchSort] = useState<SearchSort>(
+    cachedSnapshot?.searchSort ?? "relevance",
+  );
   const {
     query,
     setQuery,
@@ -38,17 +68,59 @@ export default function BrandRoute() {
     error: searchError,
     searchNow,
     loadMore,
-  } = useDebouncedSearch({ brand, sort: searchSort });
-  const [loadingModels, setLoadingModels] = useState(true);
+  } = useDebouncedSearch({
+    brand,
+    sort: searchSort,
+    cacheKey: `brand-search:${brand}`,
+  });
+  const [loadingModels, setLoadingModels] = useState(
+    !cachedSnapshot?.models.length,
+  );
   const [modelsError, setModelsError] = useState<string | null>(null);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
-  const [totalModels, setTotalModels] = useState(0);
+  const [nextOffset, setNextOffset] = useState<number | null>(
+    cachedSnapshot?.nextOffset ?? null,
+  );
+  const [totalModels, setTotalModels] = useState(
+    cachedSnapshot?.totalModels ?? 0,
+  );
+  const [brands, setBrands] = useState<DeviceBrand[]>([]);
+  const [addDeviceOpen, setAddDeviceOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
+  const [openDeleteDeviceId, setOpenDeleteDeviceId] = useState<string | null>(
+    null,
+  );
   const deviceRevision = useDataSyncStore((state) => state.deviceRevision);
+  const publishDevice = useDataSyncStore((state) => state.publishDevice);
+  const restoredInitialModels = useRef(
+    Boolean(cachedSnapshot?.models.length),
+  );
+  const lastLoadKey = useRef(`${brand}:${availabilityFilter}:${modelSort}`);
+  const lastDeviceRevision = useRef(deviceRevision);
+  const currentLoadKey = `${brand}:${availabilityFilter}:${modelSort}`;
 
   useEffect(() => {
     modelsRef.current = models;
   }, [models]);
+
+  useEffect(() => {
+    brandBrowseCache.set(brand, {
+      models,
+      nextOffset,
+      totalModels,
+      modelSort,
+      availabilityFilter,
+      searchSort,
+    });
+  }, [
+    availabilityFilter,
+    brand,
+    modelSort,
+    models,
+    nextOffset,
+    searchSort,
+    totalModels,
+  ]);
 
   const loadModels = useCallback(
     async (offset = 0) => {
@@ -56,7 +128,12 @@ export default function BrandRoute() {
       modelsLoadingRef.current = true;
       setLoadingModels(true);
       try {
-        const page = await api.getDevices({ brand, offset, sort: modelSort });
+        const page = await api.getDevices({
+          brand,
+          filter: availabilityFilter,
+          offset,
+          sort: modelSort,
+        });
         const nextModels = offset
           ? [...modelsRef.current, ...page.items].slice(0, maximumLoadedModels)
           : page.items;
@@ -78,24 +155,56 @@ export default function BrandRoute() {
         setLoadingModels(false);
       }
     },
-    [brand, modelSort],
+    [availabilityFilter, brand, modelSort],
   );
   useEffect(() => {
+    const settingsChanged = lastLoadKey.current !== currentLoadKey;
+    const revisionChanged = lastDeviceRevision.current !== deviceRevision;
+    lastLoadKey.current = currentLoadKey;
+    lastDeviceRevision.current = deviceRevision;
+    if (
+      restoredInitialModels.current &&
+      !settingsChanged &&
+      !revisionChanged
+    ) {
+      restoredInitialModels.current = false;
+      return;
+    }
     const timeout = setTimeout(() => {
       void loadModels();
     }, 0);
     return () => clearTimeout(timeout);
-  }, [deviceRevision, loadModels]);
+  }, [currentLoadKey, deviceRevision, loadModels]);
+  useEffect(() => {
+    let mounted = true;
+    api
+      .getDeviceBrands()
+      .then((items) => {
+        if (mounted) setBrands(items);
+      })
+      .catch(() => {
+        // The current route's brand remains available as a fallback below.
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [deviceRevision]);
   const refreshBrand = useCallback(async () => {
     setRefreshing(true);
     try {
       await Promise.all([
-        api.getDevices({ brand, sort: modelSort }).then((page) => {
-          setModels(page.items);
-          setNextOffset(page.nextOffset);
-          setTotalModels(page.total);
-          setModelsError(null);
-        }),
+        api
+          .getDevices({
+            brand,
+            filter: availabilityFilter,
+            sort: modelSort,
+          })
+          .then((page) => {
+            setModels(page.items);
+            setNextOffset(page.nextOffset);
+            setTotalModels(page.total);
+            setModelsError(null);
+          }),
         query.trim() ? searchNow() : Promise.resolve(),
       ]);
     } catch (reason) {
@@ -107,10 +216,46 @@ export default function BrandRoute() {
     } finally {
       setRefreshing(false);
     }
-  }, [brand, modelSort, query, searchNow]);
+  }, [availabilityFilter, brand, modelSort, query, searchNow]);
   const hasSearchQuery = Boolean(query.trim());
   const loadNextModels = () => {
     if (nextOffset !== null) void loadModels(nextOffset);
+  };
+  const deleteDevice = async (device: Device) => {
+    setDeletingDeviceId(device.id);
+    try {
+      await api.removeDevice(device.id);
+      const remainingModels = modelsRef.current.filter(
+        (item) => item.id !== device.id,
+      );
+      modelsRef.current = remainingModels;
+      setModels(remainingModels);
+      setTotalModels((current) => Math.max(0, current - 1));
+      publishDevice(device);
+    } catch (reason) {
+      Alert.alert(
+        "Couldn’t remove device",
+        reason instanceof Error
+          ? reason.message
+          : "Check the connection and try again.",
+      );
+    } finally {
+      setDeletingDeviceId(null);
+    }
+  };
+  const confirmDeleteDevice = (device: Device) => {
+    Alert.alert(
+      "Remove this device?",
+      `${device.brand} ${device.model} will be removed from the active catalogue and search. Stock history is kept.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove device",
+          style: "destructive",
+          onPress: () => void deleteDevice(device),
+        },
+      ],
+    );
   };
   const header = (
     <AppHeader
@@ -118,6 +263,13 @@ export default function BrandRoute() {
       title={brand}
       subtitle="Browse models or search the complete catalogue"
       left={<BackButton onPress={() => router.back()} />}
+      right={
+        <Button
+          label="Add device"
+          onPress={() => setAddDeviceOpen(true)}
+          size="compact"
+        />
+      }
     />
   );
   return (
@@ -167,7 +319,16 @@ export default function BrandRoute() {
             <SkeletonList count={3} variant="deviceWithoutBrand" />
           ) : null}
           {results.devices.map((device, index) => (
-            <DeviceRow device={device} key={`${device.id}-${index}`} />
+            <DeviceRow
+              device={device}
+              deleting={deletingDeviceId === device.id}
+              isDeleteOpen={openDeleteDeviceId === device.id}
+              key={`${device.id}-${index}`}
+              onDelete={confirmDeleteDevice}
+              onDeleteOpenChange={(open) =>
+                setOpenDeleteDeviceId(open ? device.id : null)
+              }
+            />
           ))}
           {results.covers.map((cover, index) => (
             <DeviceCard
@@ -196,6 +357,16 @@ export default function BrandRoute() {
           <View style={styles.modelsHeader}>
             <Text style={commonStyles.sectionTitle}>{totalModels} models</Text>
             <ListToolbar
+              filter={{
+                accessibilityLabel: "Filter phone models by availability",
+                value: availabilityFilter,
+                onApply: setAvailabilityFilter,
+                options: [
+                  { label: "All models", value: "all" },
+                  { label: "In stock", value: "in_stock" },
+                  { label: "Out of stock", value: "out_of_stock" },
+                ],
+              }}
               sort={{
                 accessibilityLabel: "Sort phone models",
                 value: modelSort,
@@ -211,7 +382,16 @@ export default function BrandRoute() {
             <SkeletonList count={5} variant="deviceWithoutBrand" />
           ) : null}
           {models.map((device, index) => (
-            <DeviceRow device={device} key={`${device.id}-${index}`} />
+            <DeviceRow
+              device={device}
+              deleting={deletingDeviceId === device.id}
+              isDeleteOpen={openDeleteDeviceId === device.id}
+              key={`${device.id}-${index}`}
+              onDelete={confirmDeleteDevice}
+              onDeleteOpenChange={(open) =>
+                setOpenDeleteDeviceId(open ? device.id : null)
+              }
+            />
           ))}
           {nextOffset !== null && loadingModels ? <LoadingMore /> : null}
           {!loadingModels && !models.length && !modelsError ? (
@@ -222,18 +402,150 @@ export default function BrandRoute() {
           ) : null}
         </>
       )}
+      <AddDeviceModal
+        brands={
+          brands.length ? brands : [{ brand, modelCount: totalModels }]
+        }
+        initialBrand={brand}
+        key={`${addDeviceOpen}-${brand}`}
+        visible={addDeviceOpen}
+        onAdded={() => {
+          setAddDeviceOpen(false);
+          void refreshBrand();
+        }}
+        onClose={() => setAddDeviceOpen(false)}
+      />
     </Screen>
   );
 }
-function DeviceRow({ device }: { device: Device }) {
+function DeviceRow({
+  device,
+  deleting,
+  isDeleteOpen,
+  onDelete,
+  onDeleteOpenChange,
+}: {
+  device: Device;
+  deleting: boolean;
+  isDeleteOpen: boolean;
+  onDelete: (device: Device) => void;
+  onDeleteOpenChange: (open: boolean) => void;
+}) {
+  const [translateX] = useState(() => new Animated.Value(0));
+  const [openSide, setOpenSide] = useState<"left" | "right" | null>(null);
+  const animateTo = useCallback(
+    (value: number, side: "left" | "right" | null) => {
+      setOpenSide(side);
+      Animated.timing(translateX, {
+        toValue: value,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+    },
+    [translateX],
+  );
+  const close = useCallback(() => {
+    animateTo(0, null);
+    onDeleteOpenChange(false);
+  }, [animateTo, onDeleteOpenChange]);
+  const open = useCallback(
+    (side: "left" | "right") => {
+      animateTo(side === "left" ? deleteRevealWidth : -deleteRevealWidth, side);
+      onDeleteOpenChange(true);
+    },
+    [animateTo, onDeleteOpenChange],
+  );
+  useEffect(() => {
+    if (!isDeleteOpen && openSide) {
+      const timeout = setTimeout(() => animateTo(0, null), 0);
+      return () => clearTimeout(timeout);
+    }
+    return undefined;
+  }, [animateTo, isDeleteOpen, openSide]);
+  useEffect(() => {
+    if (!openSide) return undefined;
+    const timeout = setTimeout(close, 5_000);
+    return () => clearTimeout(timeout);
+  }, [close, openSide]);
+  const handleCardPress = useCallback(() => {
+    if (openSide) {
+      close();
+      return;
+    }
+    router.push({ pathname: "/device/[id]", params: { id: device.id } });
+  }, [close, device.id, openSide]);
+  const panResponder = useMemo(() => {
+    const startPosition =
+      openSide === "left"
+        ? deleteRevealWidth
+        : openSide === "right"
+          ? -deleteRevealWidth
+          : 0;
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderMove: (_, gesture) => {
+        const nextPosition = Math.max(
+          -deleteRevealWidth,
+          Math.min(deleteRevealWidth, startPosition + gesture.dx),
+        );
+        translateX.setValue(nextPosition);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const finalPosition = startPosition + gesture.dx;
+        if (finalPosition > deleteRevealWidth / 2) open("left");
+        else if (finalPosition < -deleteRevealWidth / 2) open("right");
+        else close();
+      },
+      onPanResponderTerminate: close,
+    });
+  }, [close, open, openSide, translateX]);
+
   return (
-    <DeviceCard
-      device={device}
-      onPress={() =>
-        router.push({ pathname: "/device/[id]", params: { id: device.id } })
-      }
-      showBrand={false}
-    />
+    <View style={styles.swipeShell}>
+      <View pointerEvents={openSide ? "auto" : "none"} style={styles.deleteActions}>
+        <DeleteAction
+          deleting={deleting}
+          onPress={() => {
+            close();
+            onDelete(device);
+          }}
+        />
+        <DeleteAction
+          deleting={deleting}
+          onPress={() => {
+            close();
+            onDelete(device);
+          }}
+        />
+      </View>
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{ transform: [{ translateX }] }}
+      >
+        <DeviceCard device={device} onPress={handleCardPress} showBrand={false} />
+      </Animated.View>
+    </View>
+  );
+}
+
+function DeleteAction({
+  deleting,
+  onPress,
+}: {
+  deleting: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel="Remove device"
+      accessibilityRole="button"
+      disabled={deleting}
+      onPress={onPress}
+      style={styles.deleteAction}
+    >
+      <Text style={styles.deleteLabel}>{deleting ? "Removing…" : "Delete"}</Text>
+    </Pressable>
   );
 }
 const styles = StyleSheet.create({
@@ -249,4 +561,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     padding: spacing.md,
   },
+  swipeShell: { borderRadius: radius.lg, overflow: "hidden" },
+  deleteActions: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "stretch",
+    backgroundColor: colors.danger,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  deleteAction: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: deleteRevealWidth,
+    paddingHorizontal: spacing.sm,
+  },
+  deleteLabel: { color: colors.white, fontSize: 13, fontWeight: "800" },
 });

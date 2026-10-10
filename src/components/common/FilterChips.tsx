@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppText";
 import { useTheme, type ThemeColors } from "../../design-system/ThemeProvider";
 import { radius, spacing } from "../../design-system/tokens";
 
